@@ -73,17 +73,50 @@ reminder gets an **independent urgency score from 0-100** (`AIPrioritizer.swift`
 reminder, the model is given:
 
 - Title and notes
-- Due date (and whether it's overdue)
-- Creation date (so long-neglected reminders, especially ones with no due
-  date, can be weighed instead of sitting forgotten forever)
+- Due date and creation date, as **relative offsets from today** ("due in 3
+  days", "overdue by 12 days", "created 45 days ago") computed by the app,
+  not raw calendar dates — on-device models are unreliable at date
+  arithmetic, so this removes that failure mode entirely. Creation date lets
+  long-neglected reminders (especially ones with no due date) get weighed
+  instead of sitting forgotten forever.
 - The reminder's explicit priority field (High / Medium / Low / None)
 - Which Reminders list it belongs to
 
+The instructions also include a rough scoring rubric (e.g. "overdue by
+several days + high priority → 80-100", "no due date + low priority +
+recently created → 10-30") and explicitly ask the model to use the full
+0-100 range rather than clustering scores near the same value, which it
+otherwise tends to do.
+
 The model's context window can't hold an unlimited number of reminders in one
-call, so scoring is split into chunks of at most 40. Because scores are
+call, so scoring is split into chunks of at most 15 (kept deliberately small
+so each reminder gets more individual attention). Because scores are
 absolute rather than relative to a batch, combining chunks afterward is just
 a plain sort by score — no merging separately-ranked batches together, which
 was both slower and a source of bugs in an earlier ordinal-ranking design.
+
+**Two background scoring passes.** After the instant heuristic placeholder,
+new/changed reminders go through two passes, both non-blocking:
+
+1. A **batched** pass (chunks of 15) gives everyone a real AI score
+   reasonably quickly.
+2. An **individual** pass re-scores each reminder completely alone (one per
+   model call) — batching reminders together implicitly invites the model to
+   compare them, which compresses scores toward a narrow band; scoring in
+   isolation avoids that. This is meaningfully slower (one call per
+   reminder) but runs entirely in the background and every result is
+   cached, so it's a one-time cost per reminder.
+
+Verified concretely with a deliberately varied test set (overdue+high-
+priority, due-tomorrow+no-priority, no-due-date+old, etc.): the individual
+pass measurably corrected under-scoring from the batch pass in at least one
+case (a reminder due tomorrow with no explicit priority scored 0 in the
+batch pass, 40 individually) and produced a real spread across the range
+rather than clustering near 100. A remaining known imperfection: reminders
+with an explicit high-priority flag can still score close to reminders
+that are actually due soon, even when their due date is weeks or months out
+— the model appears to weight the priority flag fairly heavily. Worth
+revisiting the rubric further if it's still noticeably off in practice.
 
 If Apple Intelligence isn't available (unsupported hardware, not enabled in
 System Settings, or the on-device model is still downloading), or a given

@@ -8,8 +8,10 @@ enum AIAvailability: Sendable {
 
 struct AIPrioritizer {
     /// The model's context window limits how many reminders can be judged in
-    /// a single call, so scoring is split into batches of at most this size.
-    private static let batchSize = 40
+    /// a single call. Kept small (well under the 4096-token ceiling) so each
+    /// reminder gets more careful individual attention rather than being
+    /// diluted across a large batch.
+    private static let batchSize = 15
 
     static var availability: AIAvailability {
         switch SystemLanguageModel.default.availability {
@@ -34,21 +36,26 @@ struct AIPrioritizer {
 
     /// Returns all items ranked from most to least important. `onProgress`
     /// reports an approximate 0...1 fraction while any synchronous work runs
-    /// (in practice, negligible — see below). `onImproved` (if given) is
-    /// called later, on the main actor, once a background scoring pass
-    /// produces real AI-derived scores for anything that only had a
-    /// heuristic placeholder — the caller should treat that as a live
-    /// update, not a loading state.
+    /// (in practice, negligible). `onImproved` (if given) is called on the
+    /// main actor, potentially more than once, as background scoring passes
+    /// produce better-quality scores than what was returned synchronously —
+    /// the caller should treat each call as a live update, not a loading
+    /// state.
     ///
     /// New or changed reminders (including on the very first pass ever, with
     /// an empty cache) get an instant heuristic placeholder score so nothing
-    /// ever blocks the UI; the real model score for those reminders arrives
-    /// via `onImproved` shortly after, from a background task. An earlier
-    /// version tried a cheaper "quick" AI pass first instead of the
-    /// heuristic placeholder, but the model doesn't reliably return the
-    /// right number of scores without a per-item token to anchor each value
-    /// to a specific reminder, making it worse than just using the
-    /// heuristic directly.
+    /// ever blocks the UI. Two background passes then refine that, in order:
+    ///
+    /// 1. A batched pass (<=batchSize reminders per call) gives everyone a
+    ///    real AI score reasonably quickly.
+    /// 2. An individual pass (one reminder per call) re-scores each one
+    ///    completely on its own, with no other reminders competing for the
+    ///    model's attention in the same prompt — batching reminders together
+    ///    tends to compress scores toward a narrow band, since the model is
+    ///    implicitly comparing them; scoring alone avoids that bias. This is
+    ///    slower (one model call per reminder) but runs entirely in the
+    ///    background, and every score gets cached, so it's a one-time cost
+    ///    per reminder — unchanged reminders never pay it again.
     func rank(
         _ items: [ReminderItem],
         onProgress: (@MainActor (Double) -> Void)? = nil,
@@ -82,11 +89,20 @@ struct AIPrioritizer {
         await onProgress?(1)
 
         Task {
-            let thorough = await batchScore(toScore, using: thoroughScoreWithModel, onProgress: nil)
+            // Pass 1: batched — everyone gets a real score reasonably fast.
+            let batched = await batchScore(toScore, batchSize: Self.batchSize, onProgress: nil)
             var refined = scores
-            for (id, score) in thorough { refined[id] = score }
+            for (id, score) in batched { refined[id] = score }
             ScoreCache.save(items: items, scores: refined)
             await onImproved?(sortByScore(items, scores: refined))
+
+            // Pass 2: individual — re-score each one alone, free of any
+            // batch-composition bias, refining what pass 1 established.
+            let individual = await batchScore(toScore, batchSize: 1, onProgress: nil)
+            var finalScores = refined
+            for (id, score) in individual { finalScores[id] = score }
+            ScoreCache.save(items: items, scores: finalScores)
+            await onImproved?(sortByScore(items, scores: finalScores))
         }
 
         return placeholderResult
@@ -120,22 +136,22 @@ struct AIPrioritizer {
         min(100, max(0, Int(raw)))
     }
 
-    /// Splits items into <=batchSize chunks and scores each with the given
-    /// per-batch scoring function, reporting progress across all chunks.
+    /// Splits items into <=chunkSize chunks and scores each with the model,
+    /// reporting progress across all chunks.
     private func batchScore(
         _ items: [ReminderItem],
-        using scorer: ([ReminderItem]) async -> [String: Int],
+        batchSize chunkSize: Int,
         onProgress: (@MainActor (Double) -> Void)?
     ) async -> [String: Int] {
         guard !items.isEmpty else { return [:] }
-        let totalBatches = max(1, Int((Double(items.count) / Double(Self.batchSize)).rounded(.up)))
+        let totalBatches = max(1, Int((Double(items.count) / Double(chunkSize)).rounded(.up)))
         let tracker = ProgressTracker(estimatedCalls: totalBatches, onProgress: onProgress)
         let preSorted = HeuristicRanker.sort(items)
 
         var result: [String: Int] = [:]
-        for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
-            let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
-            let batchScores = await scorer(chunk)
+        for start in stride(from: 0, to: preSorted.count, by: chunkSize) {
+            let chunk = Array(preSorted[start..<min(start + chunkSize, preSorted.count)])
+            let batchScores = await scoreWithModel(chunk)
             for (id, score) in batchScores {
                 result[id] = score
             }
@@ -147,25 +163,28 @@ struct AIPrioritizer {
     /// The model echoes back each reminder's token alongside its score, so
     /// mapping back to items is unambiguous even if the model reorders or
     /// omits entries.
-    private func thoroughScoreWithModel(_ batch: [ReminderItem]) async -> [String: Int] {
+    private func scoreWithModel(_ batch: [ReminderItem]) async -> [String: Int] {
+        let now = Date()
         let lines = batch.enumerated().map { index, item in
-            formatLine(token: "R\(index)", item: item)
+            formatLine(token: "R\(index)", item: item, now: now)
         }
 
         let session = LanguageModelSession(
             instructions: """
             You rate a person's reminders (to-dos) on an urgency/importance scale \
             from 0 to 100, where 100 is extremely urgent or important and 0 is not \
-            urgent at all. Weigh due date (overdue and soon-due items are usually \
-            more urgent), the reminder's explicit priority level if set, and which \
-            list/project it belongs to. Also consider how long ago each reminder \
-            was created — a reminder that has sat untouched for a long time may \
-            deserve a boost so it doesn't get perpetually neglected, especially if \
-            it has no due date at all. Use the title and notes to judge real-world \
-            stakes and urgency too. Give each reminder its own independent score \
-            reflecting its true urgency, not just a relative rank — multiple \
-            reminders can and should share similar scores if they're similarly \
-            urgent. Respond only with the requested scores.
+            urgent at all. Each reminder's due date and creation date are given as \
+            relative offsets from today (e.g. "due in 3 days", "overdue by 12 days", \
+            "created 45 days ago") — use these directly rather than estimating dates \
+            yourself. As a rough guide: a reminder overdue by more than a few days, \
+            or with high explicit priority and due soon, should score 80-100; a \
+            reminder due within the next week or two with no special priority should \
+            score 40-70; a reminder with no due date, low/no priority, and created \
+            recently should score 10-30, trending higher the longer it has sat \
+            untouched so it doesn't get perpetually neglected. Use the title, notes, \
+            and list/project to judge real-world stakes too — use the full 0-100 \
+            range rather than clustering everything near the same value. Respond \
+            only with the requested scores.
             """
         )
 
@@ -174,7 +193,6 @@ struct AIPrioritizer {
             tokenToID["R\(index)"] = item.id
         }
 
-        let now = Date()
         do {
             let prompt = "Score these reminders' urgency from 0-100:\n" + lines.joined(separator: "\n")
             let response = try await session.respond(to: prompt, generating: UrgencyScores.self)
@@ -198,18 +216,13 @@ struct AIPrioritizer {
         }
     }
 
-    private func formatLine(token: String, item: ReminderItem) -> String {
+    private func formatLine(token: String, item: ReminderItem, now: Date) -> String {
         var parts = ["[\(token)]", "title=\"\(item.title)\"", "list=\"\(item.listName)\""]
 
-        if let due = item.dueDate {
-            parts.append("due=\(Self.dateFormatter.string(from: due))")
-            parts.append("overdue=\(item.isOverdue)")
-        } else {
-            parts.append("due=none")
-        }
+        parts.append("due=\(relativeDayDescription(for: item.dueDate, now: now, pastPrefix: "overdue by", pastSuffix: "", futurePrefix: "in", noneValue: "none"))")
 
         if let created = item.creationDate {
-            parts.append("created=\(Self.dateFormatter.string(from: created))")
+            parts.append("created=\(relativeDayDescription(for: created, now: now, pastPrefix: "", pastSuffix: "ago", futurePrefix: "in", noneValue: "unknown"))")
         }
 
         parts.append("priority=\(item.priorityLevel.rawValue)")
@@ -222,11 +235,39 @@ struct AIPrioritizer {
         return parts.joined(separator: " ")
     }
 
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter
-    }()
+    /// Converts an absolute date into a human-readable relative description
+    /// ("overdue by 12 days", "in 3 days", "45 days ago", "today") anchored
+    /// to `now`, computed by the app rather than left for the model to infer
+    /// from two raw timestamps — on-device models are unreliable at date
+    /// arithmetic, so doing it here removes that entire failure mode.
+    private func relativeDayDescription(
+        for date: Date?,
+        now: Date,
+        pastPrefix: String,
+        pastSuffix: String,
+        futurePrefix: String,
+        noneValue: String
+    ) -> String {
+        guard let date else { return noneValue }
+        // Calendar-day difference (midnight to midnight), not a raw 24h
+        // rounding — otherwise something due at 11pm today, checked at 9am,
+        // would misleadingly read as "in 1 day" instead of "today".
+        let calendar = Calendar.current
+        let days = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: now),
+            to: calendar.startOfDay(for: date)
+        ).day ?? 0
+        if days == 0 { return "today" }
+        let magnitude = abs(days)
+        let unit = "day\(magnitude == 1 ? "" : "s")"
+        if days < 0 {
+            let words = [pastPrefix, "\(magnitude) \(unit)", pastSuffix].filter { !$0.isEmpty }
+            return words.joined(separator: " ")
+        } else {
+            return "\(futurePrefix) \(magnitude) \(unit)"
+        }
+    }
 }
 
 /// Tracks completed-vs-estimated model calls for one scoring pass and reports
