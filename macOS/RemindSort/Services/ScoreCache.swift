@@ -24,6 +24,15 @@ enum ScoreCache {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
+    /// True only if the cache has never been populated at all (fresh install,
+    /// or nothing has ever been scored yet) — distinct from "everything in
+    /// the current fetch happens to be new," which still counts as a normal
+    /// (non-first) pass.
+    static func hasAnyCachedScores() -> Bool {
+        let stored = (UserDefaults.standard.dictionary(forKey: key) as? [String: Int]) ?? [:]
+        return !stored.isEmpty
+    }
+
     /// Returns item.id -> score for every item whose content hash is found
     /// in the cache. Items not present here need a fresh score.
     static func cachedScores(for items: [ReminderItem]) -> [String: Int] {

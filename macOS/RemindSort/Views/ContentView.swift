@@ -6,7 +6,13 @@ struct ContentView: View {
     var body: some View {
         Group {
             switch viewModel.loadState {
-            case .idle, .loading:
+            case .idle:
+                // Brief (permission check + EventKit fetch only) — no progress
+                // bar/messaging here, that's reserved for an actual AI pass.
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            case .loading:
                 LoadingView(progress: viewModel.rankingProgress)
             case .accessDenied:
                 AccessDeniedView()

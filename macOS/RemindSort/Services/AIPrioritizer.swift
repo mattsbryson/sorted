@@ -26,19 +26,32 @@ struct AIPrioritizer {
         }
     }
 
-    /// Returns all items ranked from most to least important, using an
-    /// independent 0-100 urgency score per reminder from the on-device model
-    /// where possible, falling back to a heuristic score otherwise.
+    /// True only before the score cache has ever been populated — i.e. this
+    /// would be the very first scoring pass this app has ever done. Used to
+    /// decide whether to show a blocking loading screen at all.
+    static func isFirstPass() -> Bool {
+        !ScoreCache.hasAnyCachedScores()
+    }
+
+    /// Returns all items ranked from most to least important. `onProgress`
+    /// reports an approximate 0...1 fraction while a synchronous scoring pass
+    /// is running. `onImproved` (if given) is called later, on the main
+    /// actor, if a background refinement pass produces a better-quality
+    /// ordering than what was returned synchronously — the caller should
+    /// treat that as a live update, not a loading state.
     ///
-    /// Only reminders whose content hash isn't already cached get a fresh
-    /// score; everything else reuses its previous score for free. Because
-    /// scores are absolute (not relative to a batch), combining cached and
-    /// freshly-scored items is just a plain sort — no merging required.
-    ///
-    /// `onProgress` (if given) is called on the main actor with a 0...1
-    /// fraction as batches complete; it's an estimate, capped below 1 until
-    /// scoring actually finishes.
-    func rank(_ items: [ReminderItem], onProgress: (@MainActor (Double) -> Void)? = nil) async -> [ReminderItem] {
+    /// - On the very first pass ever (empty cache), everything is quickly
+    ///   scored with a cheap, low-detail model call so something reasonable
+    ///   appears immediately, then re-scored properly in the background.
+    /// - On every later pass, only new/changed reminders need scoring at
+    ///   all; already-cached ones are free. New/changed reminders get an
+    ///   instant heuristic placeholder score so nothing ever blocks the UI,
+    ///   then the real model score arrives via `onImproved` shortly after.
+    func rank(
+        _ items: [ReminderItem],
+        onProgress: (@MainActor (Double) -> Void)? = nil,
+        onImproved: (@MainActor ([ReminderItem]) -> Void)? = nil
+    ) async -> [ReminderItem] {
         guard !items.isEmpty else {
             await onProgress?(1)
             return []
@@ -53,24 +66,48 @@ struct AIPrioritizer {
         var scores = ScoreCache.cachedScores(for: items)
         let toScore = items.filter { scores[$0.id] == nil }
 
-        if !toScore.isEmpty {
-            let totalBatches = max(1, Int((Double(toScore.count) / Double(Self.batchSize)).rounded(.up)))
-            let tracker = ProgressTracker(estimatedCalls: totalBatches, onProgress: onProgress)
-            let preSorted = HeuristicRanker.sort(toScore)
-
-            for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
-                let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
-                let batchScores = await scoreWithModel(chunk)
-                for (id, score) in batchScores {
-                    scores[id] = score
-                }
-                await tracker.advance()
-            }
+        guard !toScore.isEmpty else {
+            // Everything's already cached — no model call, no background work.
+            await onProgress?(1)
+            return sortByScore(items, scores: scores)
         }
 
-        ScoreCache.save(items: items, scores: scores)
-        await onProgress?(1)
+        if Self.isFirstPass() {
+            let quick = await batchScore(toScore, using: quickScoreWithModel, onProgress: onProgress)
+            for (id, score) in quick { scores[id] = score }
+            ScoreCache.save(items: items, scores: scores)
+            let quickResult = sortByScore(items, scores: scores)
 
+            Task {
+                let thorough = await batchScore(toScore, using: thoroughScoreWithModel, onProgress: nil)
+                var refined = scores
+                for (id, score) in thorough { refined[id] = score }
+                ScoreCache.save(items: items, scores: refined)
+                await onImproved?(sortByScore(items, scores: refined))
+            }
+
+            return quickResult
+        } else {
+            let now = Date()
+            for item in toScore {
+                scores[item.id] = Int(HeuristicRanker.score(item, now: now))
+            }
+            let placeholderResult = sortByScore(items, scores: scores)
+            await onProgress?(1)
+
+            Task {
+                let thorough = await batchScore(toScore, using: thoroughScoreWithModel, onProgress: nil)
+                var refined = scores
+                for (id, score) in thorough { refined[id] = score }
+                ScoreCache.save(items: items, scores: refined)
+                await onImproved?(sortByScore(items, scores: refined))
+            }
+
+            return placeholderResult
+        }
+    }
+
+    private func sortByScore(_ items: [ReminderItem], scores: [String: Int]) -> [ReminderItem] {
         let now = Date()
         let heuristicOrder = HeuristicRanker.sort(items)
         let heuristicIndex = Dictionary(uniqueKeysWithValues: heuristicOrder.enumerated().map { ($1.id, $0) })
@@ -84,10 +121,34 @@ struct AIPrioritizer {
         }
     }
 
-    /// Scores one batch (<=batchSize) of reminders via the model. Never
-    /// throws to the caller — falls back to a heuristic-derived score per
-    /// item on any failure, or for anything the model's response omits.
-    private func scoreWithModel(_ batch: [ReminderItem]) async -> [String: Int] {
+    /// Splits items into <=batchSize chunks and scores each with the given
+    /// per-batch scoring function, reporting progress across all chunks.
+    private func batchScore(
+        _ items: [ReminderItem],
+        using scorer: ([ReminderItem]) async -> [String: Int],
+        onProgress: (@MainActor (Double) -> Void)?
+    ) async -> [String: Int] {
+        guard !items.isEmpty else { return [:] }
+        let totalBatches = max(1, Int((Double(items.count) / Double(Self.batchSize)).rounded(.up)))
+        let tracker = ProgressTracker(estimatedCalls: totalBatches, onProgress: onProgress)
+        let preSorted = HeuristicRanker.sort(items)
+
+        var result: [String: Int] = [:]
+        for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
+            let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
+            let batchScores = await scorer(chunk)
+            for (id, score) in batchScores {
+                result[id] = score
+            }
+            await tracker.advance()
+        }
+        return result
+    }
+
+    /// The full, more explicit scoring call: the model echoes back each
+    /// reminder's token alongside its score, so mapping back to items is
+    /// unambiguous even if the model reorders or omits entries.
+    private func thoroughScoreWithModel(_ batch: [ReminderItem]) async -> [String: Int] {
         let lines = batch.enumerated().map { index, item in
             formatLine(token: "R\(index)", item: item)
         }
@@ -121,7 +182,6 @@ struct AIPrioritizer {
                     result[id] = min(100, max(0, entry.score))
                 }
             }
-            // Fall back to a heuristic score for anything the model omitted.
             let now = Date()
             for item in batch where result[item.id] == nil {
                 result[item.id] = Int(HeuristicRanker.score(item, now: now))
@@ -129,6 +189,50 @@ struct AIPrioritizer {
             return result
         } catch {
             let now = Date()
+            var result: [String: Int] = [:]
+            for item in batch {
+                result[item.id] = Int(HeuristicRanker.score(item, now: now))
+            }
+            return result
+        }
+    }
+
+    /// A cheaper, faster scoring call for the very first ranking pass: plain
+    /// integers matched back to items purely by position, no per-item token
+    /// field to generate. Roughly halves the output the model has to
+    /// produce compared to the thorough call above.
+    private func quickScoreWithModel(_ batch: [ReminderItem]) async -> [String: Int] {
+        let lines = batch.enumerated().map { index, item in
+            formatLine(token: "R\(index)", item: item)
+        }
+
+        let session = LanguageModelSession(
+            instructions: """
+            You rate a person's reminders (to-dos) on an urgency/importance scale \
+            from 0 to 100, where 100 is extremely urgent or important and 0 is not \
+            urgent at all. Weigh due date, priority, and list. Respond only with \
+            the requested scores, in the same order the reminders were listed.
+            """
+        )
+
+        let now = Date()
+        do {
+            let prompt = "Score these reminders' urgency from 0-100, one score per reminder in listed order:\n"
+                + lines.joined(separator: "\n")
+            let response = try await session.respond(to: prompt, generating: QuickScores.self)
+
+            guard response.content.scores.count == batch.count else {
+                var result: [String: Int] = [:]
+                for item in batch { result[item.id] = Int(HeuristicRanker.score(item, now: now)) }
+                return result
+            }
+
+            var result: [String: Int] = [:]
+            for (index, item) in batch.enumerated() {
+                result[item.id] = min(100, max(0, response.content.scores[index]))
+            }
+            return result
+        } catch {
             var result: [String: Int] = [:]
             for item in batch {
                 result[item.id] = Int(HeuristicRanker.score(item, now: now))

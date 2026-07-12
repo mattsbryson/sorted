@@ -79,6 +79,25 @@ model call fails, ranking falls back to a deterministic heuristic score
 the app still works, it just won't be AI-scored, and a small note explains
 why on the Home screen when AI is unavailable entirely.
 
+**Two-pass scoring.** There are two request shapes:
+
+- `UrgencyScores` — the model echoes back each reminder's token alongside its
+  score, so mapping the response back to items is unambiguous. This is the
+  "real" pass, used everywhere except the one case below.
+- `QuickScores` — plain integers with no token field, matched back to items
+  purely by position. Cheaper to generate (roughly half the output of
+  `UrgencyScores`) but less safe if the model ever miscounts.
+
+On the very first scoring pass this app has ever done (empty cache — a fresh
+install, or before anything's been scored yet), everything is scored with the
+cheap `QuickScores` pass first so something reasonable appears immediately,
+then silently re-scored with the full `UrgencyScores` pass as a background
+task that updates the UI when it finishes. Every later pass skips `QuickScores`
+entirely: only new/changed reminders need scoring at all (see the cache below),
+so they get an instant heuristic placeholder instead while the real
+`UrgencyScores` call runs in the background — nothing ever blocks the UI
+after that first pass.
+
 ### Ranking cache
 
 Running the on-device model takes several seconds, so each reminder's score
@@ -104,11 +123,14 @@ scoring pass.
 
 ### Loading screen
 
-While a refresh needs the model, the app shows a progress bar and "Reminders
-are being processed and sorted…" rather than a bare spinner. Progress is a
-real (if approximate) estimate of completed vs. expected model calls for that
-refresh — since most refreshes only need to rank a handful of new/changed
-reminders thanks to the cache above, this is usually brief.
+The full-screen progress bar ("Reminders are being processed and sorted…") is
+reserved for that one first-ever scoring pass described above — it's the only
+time the app has nothing to show yet. Every later launch or refresh goes
+straight to the tabs with whatever's available (cached scores, or an instant
+heuristic placeholder for anything new) while the real score for new/changed
+reminders arrives quietly in the background; there's no blocking screen for
+it. Progress during the first pass is a real (if approximate) estimate of
+completed vs. expected model calls.
 
 ### Swipe-to-skip (Today tab)
 

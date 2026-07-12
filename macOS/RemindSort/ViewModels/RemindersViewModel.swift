@@ -61,12 +61,24 @@ final class RemindersViewModel {
     }
 
     func refresh() async {
-        loadState = .loading
-        rankingProgress = 0
+        // The full-screen loading state is reserved for the very first scoring
+        // pass this app has ever done; on every later launch/refresh, results
+        // (cached, or an instant heuristic placeholder for anything new) show
+        // immediately and any AI refinement arrives quietly via onImproved.
+        let isFirstPass = AIPrioritizer.isFirstPass()
+        if isFirstPass {
+            loadState = .loading
+            rankingProgress = 0
+        }
         do {
             let items = try await remindersService.fetchIncompleteReminders()
             rankedReminders = await prioritizer.rank(items) { [self] fraction in
                 rankingProgress = fraction
+            } onImproved: { [self] improved in
+                rankedReminders = improved
+                if homeIndex >= rankedReminders.count {
+                    homeIndex = 0
+                }
             }
             homeIndex = 0
             skippedTodayIDs.removeAll()

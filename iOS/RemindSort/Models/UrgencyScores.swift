@@ -20,3 +20,15 @@ struct UrgencyScores: Sendable {
     @Guide(description: "One score entry per reminder token given in the prompt. Every token must appear exactly once.")
     var scores: [ReminderScore]
 }
+
+/// A cheaper, faster-to-generate alternative to UrgencyScores: plain integers
+/// with no per-item token field, matched back to reminders purely by position
+/// (same order as the prompt list). Used only for the very first, never-been-
+/// cached scoring pass, where getting *something* on screen quickly matters
+/// more than the extra safety of explicit token labeling — the fuller
+/// UrgencyScores pass follows shortly after in the background to refine it.
+@Generable
+struct QuickScores: Sendable {
+    @Guide(description: "Urgency scores from 0 (not urgent) to 100 (extremely urgent), one integer per reminder, in the exact same order the reminders were listed in the prompt. Must contain exactly as many scores as reminders listed.")
+    var scores: [Int]
+}
