@@ -177,14 +177,14 @@ struct AIPrioritizer {
             relative offsets from today (e.g. "due in 3 days", "overdue by 12 days", \
             "created 45 days ago") — use these directly rather than estimating dates \
             yourself. As a rough guide: a reminder overdue by more than a few days, \
-            or with high explicit priority and due soon, should score 80-100; a \
-            reminder due within the next week or two with no special priority should \
-            score 40-70; a reminder with no due date, low/no priority, and created \
-            recently should score 10-30, trending higher the longer it has sat \
-            untouched so it doesn't get perpetually neglected. Use the title, notes, \
-            and list/project to judge real-world stakes too — use the full 0-100 \
-            range rather than clustering everything near the same value. Respond \
-            only with the requested scores.
+            or due very soon with real stakes evident from its title or notes, \
+            should score 80-100; a reminder due within the next week or two should \
+            score 40-70; a reminder with no due date, created recently, should score \
+            10-30, trending higher the longer it has sat untouched so it doesn't get \
+            perpetually neglected. Use the title, notes, and list/project to judge \
+            real-world stakes and urgency — use the full 0-100 range rather than \
+            clustering everything near the same value. Respond only with the \
+            requested scores.
             """
         )
 
@@ -224,8 +224,6 @@ struct AIPrioritizer {
         if let created = item.creationDate {
             parts.append("created=\(relativeDayDescription(for: created, now: now, pastPrefix: "", pastSuffix: "ago", futurePrefix: "in", noneValue: "unknown"))")
         }
-
-        parts.append("priority=\(item.priorityLevel.rawValue)")
 
         if let notes = item.notes, !notes.isEmpty {
             let trimmed = notes.count > 140 ? String(notes.prefix(140)) + "…" : notes

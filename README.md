@@ -79,14 +79,21 @@ reminder, the model is given:
   arithmetic, so this removes that failure mode entirely. Creation date lets
   long-neglected reminders (especially ones with no due date) get weighed
   instead of sitting forgotten forever.
-- The reminder's explicit priority field (High / Medium / Low / None)
 - Which Reminders list it belongs to
 
+The reminder's explicit priority field (`EKReminder.priority` — the
+none/low/medium/high flag you can set in Reminders.app, read directly via
+EventKit's public API, no scripting involved) is deliberately **not** sent
+to the model. Early testing showed the model weighted it too heavily,
+scoring reminders close to 100 just for being marked high-priority even
+when due weeks or months out. Priority is still shown in the UI
+(`PriorityBadge`) and still used by the heuristic fallback (see below); it's
+only excluded from what the AI scoring call sees.
+
 The instructions also include a rough scoring rubric (e.g. "overdue by
-several days + high priority → 80-100", "no due date + low priority +
-recently created → 10-30") and explicitly ask the model to use the full
-0-100 range rather than clustering scores near the same value, which it
-otherwise tends to do.
+several days → 80-100", "no due date, recently created → 10-30") and
+explicitly ask the model to use the full 0-100 range rather than clustering
+scores near the same value, which it otherwise tends to do.
 
 The model's context window can't hold an unlimited number of reminders in one
 call, so scoring is split into chunks of at most 15 (kept deliberately small
@@ -112,11 +119,9 @@ priority, due-tomorrow+no-priority, no-due-date+old, etc.): the individual
 pass measurably corrected under-scoring from the batch pass in at least one
 case (a reminder due tomorrow with no explicit priority scored 0 in the
 batch pass, 40 individually) and produced a real spread across the range
-rather than clustering near 100. A remaining known imperfection: reminders
-with an explicit high-priority flag can still score close to reminders
-that are actually due soon, even when their due date is weeks or months out
-— the model appears to weight the priority flag fairly heavily. Worth
-revisiting the rubric further if it's still noticeably off in practice.
+rather than clustering near 100. That same test also surfaced the
+priority-flag over-weighting described above, which led to dropping
+priority from the model's input entirely.
 
 If Apple Intelligence isn't available (unsupported hardware, not enabled in
 System Settings, or the on-device model is still downloading), or a given
