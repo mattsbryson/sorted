@@ -14,8 +14,8 @@ struct AIPrioritizer {
     private static let batchSize = 15
 
     /// Score range assigned to each tier; reminders within a tier are spread
-    /// across its band by the heuristic (due-date proximity etc.), most
-    /// urgent first.
+    /// evenly across its band in stable original order — the AI's tier
+    /// classification is the only priority signal, not a heuristic.
     private static let tierBands: [UrgencyTier: ClosedRange<Int>] = [
         .critical: 90...100,
         .high: 70...89,
@@ -49,9 +49,13 @@ struct AIPrioritizer {
     /// urgency tier (critical/high/medium/low/minimal) rather than asked for
     /// a fine-grained number directly — categorical judgments are a more
     /// reliable task for the on-device model. The final 0-100 score is then
-    /// computed in code: reminders sharing a tier are spread across that
-    /// tier's band by the deterministic heuristic, so the coarse AI judgment
-    /// and the precise date-based ordering combine into one score. Already-
+    /// computed in code: reminders sharing a tier are spread evenly across
+    /// that tier's band in the order the model returned them — priority is
+    /// AI-only, so there's no heuristic re-sorting mixed in once the model
+    /// has actually classified an item. The heuristic (`HeuristicRanker`) is
+    /// kept only as a fallback for when the model can't produce a real
+    /// answer at all (Apple Intelligence unavailable, a model call throwing,
+    /// or a specific reminder missing from the model's response). Already-
     /// cached reminders are free; if nothing needs classifying, this returns
     /// immediately with no model call at all.
     func rank(
@@ -90,9 +94,11 @@ struct AIPrioritizer {
     }
 
     /// Converts tier classifications into concrete 0-100 scores: reminders
-    /// in the same tier are sorted by the heuristic and spread evenly across
-    /// that tier's band, most urgent first. Anything the model didn't
-    /// classify falls back to a heuristic-derived tier.
+    /// in the same tier are spread evenly across that tier's band in stable
+    /// original order (no heuristic re-sorting — the AI's tier is the only
+    /// priority signal once it's actually classified something). Anything
+    /// the model didn't classify falls back to a heuristic-derived tier,
+    /// since that's a real failure case, not a normal AI-classified item.
     private func computeScores(
         for items: [ReminderItem],
         tiers: [String: UrgencyTier],
@@ -109,15 +115,15 @@ struct AIPrioritizer {
             guard let group = byTier[tier], !group.isEmpty else { continue }
             guard let band = Self.tierBands[tier] else { continue }
 
-            let sorted = group.sorted { HeuristicRanker.score($0, now: now) > HeuristicRanker.score($1, now: now) }
-            if sorted.count == 1 {
-                scores[sorted[0].id] = band.upperBound
+            if group.count == 1 {
+                scores[group[0].id] = band.upperBound
                 continue
             }
             let span = Double(band.upperBound - band.lowerBound)
-            for (index, item) in sorted.enumerated() {
-                // 1.0 for the most urgent in the tier, 0.0 for the least.
-                let fraction = Double(sorted.count - 1 - index) / Double(sorted.count - 1)
+            for (index, item) in group.enumerated() {
+                // 1.0 for the first in the group, 0.0 for the last — stable
+                // original order, not a heuristic-derived ranking.
+                let fraction = Double(group.count - 1 - index) / Double(group.count - 1)
                 scores[item.id] = Int((Double(band.lowerBound) + fraction * span).rounded())
             }
         }
@@ -128,39 +134,38 @@ struct AIPrioritizer {
     /// when the model omits a reminder from its response.
     private func heuristicTier(for item: ReminderItem, now: Date) -> UrgencyTier {
         switch HeuristicRanker.score(item, now: now) {
-        case 130...: .critical
-        case 80..<130: .high
-        case 40..<80: .medium
-        case 10..<40: .low
+        case 95...: .critical
+        case 55..<95: .high
+        case 18..<55: .medium
+        case 5..<18: .low
         default: .minimal
         }
     }
 
+    /// Used only if an item somehow has no score at all (shouldn't happen —
+    /// every classified item gets one via `computeScores`, and every cached
+    /// item has one by construction). A fixed neutral value rather than a
+    /// heuristic score, so priority stays AI-only even in this dead-code
+    /// path.
+    private static let fallbackScore = 50
+
     private func sortByScore(_ items: [ReminderItem], scores: [String: Int]) -> [ReminderItem] {
-        let now = Date()
-        let heuristicOrder = HeuristicRanker.sort(items)
-        let heuristicIndex = Dictionary(uniqueKeysWithValues: heuristicOrder.enumerated().map { ($1.id, $0) })
+        let originalIndex = Dictionary(uniqueKeysWithValues: items.enumerated().map { ($1.id, $0) })
 
         // Attach the score that actually determined each item's position, so
         // it's available for display (e.g. a "show urgency score" setting).
         let withScores = items.map { item in
-            item.withScore(scores[item.id] ?? clampedScore(HeuristicRanker.score(item, now: now)))
+            item.withScore(scores[item.id] ?? Self.fallbackScore)
         }
 
         return withScores.sorted { a, b in
             let scoreA = a.score ?? 0
             let scoreB = b.score ?? 0
             if scoreA != scoreB { return scoreA > scoreB }
-            // Stable tie-break so equal scores don't jump around between runs.
-            return (heuristicIndex[a.id] ?? .max) < (heuristicIndex[b.id] ?? .max)
+            // Stable tie-break in original fetch order — not a heuristic
+            // re-sort — so equal scores don't jump around between runs.
+            return (originalIndex[a.id] ?? .max) < (originalIndex[b.id] ?? .max)
         }
-    }
-
-    /// Heuristic scores aren't bounded the way tier bands are (a very
-    /// overdue item can score well past 100), so anything derived straight
-    /// from the heuristic gets clamped to 0-100 for consistency.
-    private func clampedScore(_ raw: Double) -> Int {
-        min(100, max(0, Int(raw)))
     }
 
     /// Splits items into <=batchSize chunks and classifies each with the
@@ -172,11 +177,13 @@ struct AIPrioritizer {
         guard !items.isEmpty else { return [:] }
         let totalBatches = max(1, Int((Double(items.count) / Double(Self.batchSize)).rounded(.up)))
         let tracker = ProgressTracker(estimatedCalls: totalBatches, onProgress: onProgress)
-        let preSorted = HeuristicRanker.sort(items)
 
+        // Chunked in original order, not heuristic-sorted — batch
+        // composition shouldn't be influenced by the heuristic either, since
+        // each reminder is judged independently regardless of chunk order.
         var result: [String: UrgencyTier] = [:]
-        for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
-            let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
+        for start in stride(from: 0, to: items.count, by: Self.batchSize) {
+            let chunk = Array(items[start..<min(start + Self.batchSize, items.count)])
             let batchTiers = await classifyWithModel(chunk)
             for (id, tier) in batchTiers {
                 result[id] = tier

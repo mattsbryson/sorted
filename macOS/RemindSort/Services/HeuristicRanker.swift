@@ -6,17 +6,24 @@ enum HeuristicRanker {
     static func score(_ item: ReminderItem, now: Date = Date()) -> Double {
         var s = 0.0
         switch item.priorityLevel {
-        case .high: s += 30
-        case .medium: s += 15
-        case .low: s += 5
+        case .high: s += 40
+        case .medium: s += 20
+        case .low: s += 8
         case .none: s += 0
         }
         if let due = item.dueDate {
             let hours = due.timeIntervalSince(now) / 3600
             if hours < 0 {
-                s += 100 + min(-hours, 5000) / 10
+                // Being overdue at all is the strong signal; how much *more*
+                // overdue matters far less, and is capped (10 days) so a
+                // long-overdue, low-priority reminder can't drown out the
+                // priority term the way an uncapped bonus did.
+                s += 60 + min(-hours, 240) / 12
             } else {
-                s += max(0, 100 - hours / 24)
+                // Fades out over ~15 days so far-future due dates barely
+                // register, without an unbounded penalty in the other
+                // direction.
+                s += max(0, 60 - hours / 6)
             }
         }
         return s
