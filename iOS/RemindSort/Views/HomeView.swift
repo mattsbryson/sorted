@@ -8,6 +8,21 @@ struct HomeView: View {
     @State private var snoozeUnit: SnoozeUnit = .day
 
     var body: some View {
+        NavigationStack {
+            content
+                .toolbar {
+                    ToolbarItem(placement: .automatic) {
+                        Button {
+                            Task { await viewModel.refresh() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                }
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 24) {
             if let note = viewModel.aiNote {
                 Label(note, systemImage: "sparkles")
@@ -92,15 +107,6 @@ struct HomeView: View {
             }
 
             Spacer()
-
-            Button {
-                Task { await viewModel.refresh() }
-            } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .padding(.bottom, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

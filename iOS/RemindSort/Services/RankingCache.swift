@@ -1,46 +1,74 @@
 import CryptoKit
 import Foundation
 
-/// Persists the last AI-ranked order to disk so the (slow) on-device model
-/// only has to re-run when the underlying reminders have actually changed —
-/// not on every app launch or manual refresh.
+/// Persists the last AI-ranked order to disk **per reminder**, so a refresh
+/// only has to rank reminders that are actually new or changed — unchanged
+/// reminders keep their previously established position without ever
+/// touching the model again.
 enum RankingCache {
-    private static let fingerprintKey = "RemindSort.rankingCache.fingerprint"
+    private static let hashesKey = "RemindSort.rankingCache.itemHashes"
     private static let orderKey = "RemindSort.rankingCache.order"
 
-    /// A stable content hash of everything that could affect ranking. Order-
-    /// independent (sorted by id first) so re-fetching in a different order
-    /// doesn't look like a change.
-    static func fingerprint(for items: [ReminderItem]) -> String {
-        let sorted = items.sorted { $0.id < $1.id }
-        var lines: [String] = []
-        lines.reserveCapacity(sorted.count)
-        for item in sorted {
-            let due: String = item.dueDate.map { String($0.timeIntervalSince1970) } ?? ""
-            let created: String = item.creationDate.map { String($0.timeIntervalSince1970) } ?? ""
-            let notes: String = item.notes ?? ""
-            let priority: String = String(item.rawPriority)
-            let line = [item.id, item.title, notes, due, priority, item.listName, created]
-                .joined(separator: "\u{1}")
-            lines.append(line)
-        }
-        let joined = lines.joined(separator: "\u{2}")
+    struct Diff {
+        /// Previously ranked items that are unchanged, in their previous
+        /// relative order.
+        let unchanged: [ReminderItem]
+        /// New reminders, or ones whose ranking-relevant fields changed —
+        /// these are the only ones that need a fresh AI ranking pass.
+        let toRank: [ReminderItem]
+    }
 
+    /// A stable content hash of everything about this reminder that could
+    /// affect its ranking.
+    static func contentHash(for item: ReminderItem) -> String {
+        let due = item.dueDate.map { String($0.timeIntervalSince1970) } ?? ""
+        let created = item.creationDate.map { String($0.timeIntervalSince1970) } ?? ""
+        let notes = item.notes ?? ""
+        let priority = String(item.rawPriority)
+        let joined = [item.id, item.title, notes, due, priority, item.listName, created]
+            .joined(separator: "\u{1}")
         let digest = SHA256.hash(data: Data(joined.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Returns the cached ranked ID order if it was saved for this exact
-    /// fingerprint, nil otherwise (cache miss — something changed).
-    static func loadOrder(matching fingerprint: String) -> [String]? {
+    /// Splits the current items into "unchanged, reuse previous position"
+    /// and "new/changed, needs (re-)ranking" by comparing against the last
+    /// saved per-item hashes. Anything no longer present (completed/deleted
+    /// elsewhere) is simply dropped, not carried forward.
+    static func diff(against items: [ReminderItem]) -> Diff {
         let defaults = UserDefaults.standard
-        guard defaults.string(forKey: fingerprintKey) == fingerprint else { return nil }
-        return defaults.stringArray(forKey: orderKey)
+        let savedHashes = defaults.dictionary(forKey: hashesKey) as? [String: String] ?? [:]
+        let savedOrder = defaults.stringArray(forKey: orderKey) ?? []
+
+        let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+
+        var toRank: [ReminderItem] = []
+        var unchangedIDs = Set<String>()
+        for item in items {
+            if savedHashes[item.id] == contentHash(for: item) {
+                unchangedIDs.insert(item.id)
+            } else {
+                toRank.append(item)
+            }
+        }
+
+        let unchanged = savedOrder.compactMap { id in
+            unchangedIDs.contains(id) ? byID[id] : nil
+        }
+
+        return Diff(unchanged: unchanged, toRank: toRank)
     }
 
-    static func save(fingerprint: String, order: [String]) {
+    /// Saves the final ranked order along with each item's current content
+    /// hash, so the next diff() can tell exactly what changed.
+    static func save(rankedItems: [ReminderItem]) {
         let defaults = UserDefaults.standard
-        defaults.set(fingerprint, forKey: fingerprintKey)
-        defaults.set(order, forKey: orderKey)
+        var hashes: [String: String] = [:]
+        hashes.reserveCapacity(rankedItems.count)
+        for item in rankedItems {
+            hashes[item.id] = contentHash(for: item)
+        }
+        defaults.set(hashes, forKey: hashesKey)
+        defaults.set(rankedItems.map(\.id), forKey: orderKey)
     }
 }

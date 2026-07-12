@@ -27,46 +27,82 @@ struct AIPrioritizer {
     }
 
     /// Returns all items ranked from most to least important, using the on-device
-    /// model where possible and falling back to heuristics otherwise. Skips the
-    /// (slow) model call entirely if nothing has changed since the last ranking.
-    func rank(_ items: [ReminderItem]) async -> [ReminderItem] {
-        guard !items.isEmpty else { return [] }
-
-        let fingerprint = RankingCache.fingerprint(for: items)
-        if let cachedOrder = RankingCache.loadOrder(matching: fingerprint) {
-            let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
-            let cached = cachedOrder.compactMap { byID[$0] }
-            if cached.count == items.count {
-                return cached
-            }
+    /// model where possible and falling back to heuristics otherwise.
+    ///
+    /// Only reminders that are new or have actually changed since the last
+    /// ranking pass are sent to the model — everything unchanged keeps its
+    /// previously established position for free. New/changed items are
+    /// ranked among themselves, then merged into the existing order.
+    ///
+    /// `onProgress` (if given) is called on the main actor with a 0...1
+    /// fraction as batches complete; it's an estimate, capped below 1 until
+    /// ranking actually finishes.
+    func rank(_ items: [ReminderItem], onProgress: (@MainActor (Double) -> Void)? = nil) async -> [ReminderItem] {
+        guard !items.isEmpty else {
+            await onProgress?(1)
+            return []
         }
+
+        let diff = RankingCache.diff(against: items)
 
         guard case .available = Self.availability else {
-            return HeuristicRanker.sort(items)
+            let sorted = HeuristicRanker.sort(items)
+            await onProgress?(1)
+            return sorted
         }
 
-        let result = await rankAll(items)
-        RankingCache.save(fingerprint: fingerprint, order: result.map(\.id))
+        guard !diff.toRank.isEmpty else {
+            // Nothing new or changed — reuse the cached order entirely, no model call.
+            await onProgress?(1)
+            return diff.unchanged
+        }
+
+        let tracker = ProgressTracker(estimatedCalls: estimatedCallCount(for: diff), onProgress: onProgress)
+
+        let rankedNew = await rankGroup(diff.toRank, tracker: tracker)
+        let result: [ReminderItem]
+        if diff.unchanged.isEmpty {
+            result = rankedNew
+        } else {
+            result = await mergeRuns([diff.unchanged, rankedNew], tracker: tracker)
+        }
+
+        RankingCache.save(rankedItems: result)
+        await onProgress?(1)
         return result
     }
 
-    /// Splits the full set into <=batchSize chunks, ranks each chunk
-    /// independently, then merges the ranked chunks together.
-    private func rankAll(_ items: [ReminderItem]) async -> [ReminderItem] {
+    private func estimatedCallCount(for diff: RankingCache.Diff) -> Int {
+        let toRankBatches = max(1, Int((Double(diff.toRank.count) / Double(Self.batchSize)).rounded(.up)))
+        let mergeEstimate = diff.unchanged.isEmpty ? 0 : max(1, toRankBatches)
+        return max(1, toRankBatches * 2 + mergeEstimate)
+    }
+
+    /// Ranks a single group of reminders in full: splits into <=batchSize
+    /// chunks, ranks each independently, then merges the ranked chunks.
+    private func rankGroup(_ items: [ReminderItem], tracker: ProgressTracker) async -> [ReminderItem] {
         let preSorted = HeuristicRanker.sort(items)
 
+        guard preSorted.count > 1 else {
+            // A single item has nothing to compare against — no call needed.
+            return preSorted
+        }
+
         guard preSorted.count > Self.batchSize else {
-            return (try? await rankWithModel(preSorted)) ?? preSorted
+            let result = (try? await rankWithModel(preSorted)) ?? preSorted
+            await tracker.advance()
+            return result
         }
 
         var runs: [[ReminderItem]] = []
         for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
             let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
             let ranked = (try? await rankWithModel(chunk)) ?? chunk
+            await tracker.advance()
             runs.append(ranked)
         }
 
-        return await mergeRuns(runs)
+        return await mergeRuns(runs, tracker: tracker)
     }
 
     /// A k-way "merge sort" merge, generalized from pairwise comparison to
@@ -74,7 +110,7 @@ struct AIPrioritizer {
     /// run (N chosen so the combined pool stays within batchSize), asks the
     /// model to rank that pool together, locks the result into the final
     /// order, and continues with the shortened runs until everything merges.
-    private func mergeRuns(_ initialRuns: [[ReminderItem]]) async -> [ReminderItem] {
+    private func mergeRuns(_ initialRuns: [[ReminderItem]], tracker: ProgressTracker) async -> [ReminderItem] {
         var runs = initialRuns.filter { !$0.isEmpty }
         var result: [ReminderItem] = []
 
@@ -89,6 +125,7 @@ struct AIPrioritizer {
             }
 
             let ranked = (try? await rankWithModel(pool)) ?? pool
+            await tracker.advance()
             result.append(contentsOf: ranked)
 
             runs = zip(runs, taken).compactMap { run, take in
@@ -166,4 +203,24 @@ struct AIPrioritizer {
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
         return formatter
     }()
+}
+
+/// Tracks completed-vs-estimated model calls for one ranking pass and reports
+/// an approximate 0...1 fraction, capped below 1 until the caller marks
+/// completion explicitly (estimates can under/overshoot the real call count).
+private final class ProgressTracker {
+    private let total: Int
+    private var completed = 0
+    private let onProgress: (@MainActor (Double) -> Void)?
+
+    init(estimatedCalls: Int, onProgress: (@MainActor (Double) -> Void)?) {
+        self.total = max(estimatedCalls, 1)
+        self.onProgress = onProgress
+    }
+
+    func advance() async {
+        completed += 1
+        let fraction = min(0.95, Double(completed) / Double(total))
+        await onProgress?(fraction)
+    }
 }

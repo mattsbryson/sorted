@@ -17,6 +17,7 @@ final class RemindersViewModel {
     private(set) var rankedReminders: [ReminderItem] = []
     private(set) var homeIndex: Int = 0
     private(set) var aiNote: String?
+    private(set) var rankingProgress: Double = 0
 
     private let remindersService = RemindersService()
     private let prioritizer = AIPrioritizer()
@@ -61,9 +62,12 @@ final class RemindersViewModel {
 
     func refresh() async {
         loadState = .loading
+        rankingProgress = 0
         do {
             let items = try await remindersService.fetchIncompleteReminders()
-            rankedReminders = await prioritizer.rank(items)
+            rankedReminders = await prioritizer.rank(items) { [self] fraction in
+                rankingProgress = fraction
+            }
             homeIndex = 0
             skippedTodayIDs.removeAll()
             loadState = .loaded

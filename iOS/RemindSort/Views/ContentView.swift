@@ -7,8 +7,7 @@ struct ContentView: View {
         Group {
             switch viewModel.loadState {
             case .idle, .loading:
-                ProgressView("Loading reminders…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                LoadingView(progress: viewModel.rankingProgress)
             case .accessDenied:
                 AccessDeniedView()
             case .error(let message):
@@ -17,6 +16,7 @@ struct ContentView: View {
                 tabs
             }
         }
+        .background(Color(.systemBackground))
         .task {
             await viewModel.start()
         }
@@ -38,6 +38,26 @@ struct ContentView: View {
             ReminderListView(title: "Someday", items: viewModel.somedayItems)
                 .tabItem { Label("Someday", systemImage: "tray.fill") }
         }
+    }
+}
+
+private struct LoadingView: View {
+    let progress: Double
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView(value: progress)
+                .progressViewStyle(.linear)
+                .frame(maxWidth: 240)
+
+            Text("Reminders are being processed and sorted…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
     }
 }
 

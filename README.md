@@ -29,7 +29,8 @@ cd macOS && xcodegen generate   # or: cd iOS && xcodegen generate
 ### Four tabs
 
 - **Home** — shows a single card for the most important reminder overall,
-  determined by AI ranking (see below).
+  determined by AI ranking (see below). A refresh button sits in the top-right
+  toolbar, same placement as the other three tabs.
   - **Snooze** opens a picker (spinning wheel on iOS; stepper + segmented
     control on macOS, since SwiftUI's wheel picker style is iOS-only) to pick
     an amount and a unit (Day/Week/Month), then pushes the reminder's due
@@ -89,13 +90,31 @@ and linear, not one call per reminder.
 
 ### Ranking cache
 
-Running the on-device model takes several seconds, so its result is cached
-(`RankingCache.swift`, persisted via `UserDefaults`) against a content hash
-of every reminder's title, notes, due date, priority, and list. On the next
-launch or manual refresh, if that hash is unchanged the cached order is
-reused instantly and the model isn't invoked at all. Any actual change —
-a new reminder, an edited title/notes/due date/priority, or moving lists —
-invalidates the cache and triggers a fresh ranking pass.
+Running the on-device model takes several seconds, so previous results are
+cached **per reminder**, not as one all-or-nothing snapshot
+(`RankingCache.swift`, persisted via `UserDefaults`). Each reminder's
+content hash (title, notes, due date, priority, list) is stored alongside
+its position in the last ranked order. On the next launch or manual refresh:
+
+- Reminders whose hash is unchanged keep their previous position for free —
+  no model call at all.
+- Only reminders that are new, or whose hash changed (edited title/notes/due
+  date/priority/list), get ranked. If none did, refresh is instant with zero
+  model calls.
+- Those new/changed reminders are ranked among themselves, then merged into
+  the existing cached order using the same batched merge-sort-style process
+  described above, so only the delta ever costs a model call — not the whole
+  list.
+- Reminders no longer present (completed/deleted elsewhere) are simply
+  dropped from the cached order.
+
+### Loading screen
+
+While a refresh needs the model, the app shows a progress bar and "Reminders
+are being processed and sorted…" rather than a bare spinner. Progress is a
+real (if approximate) estimate of completed vs. expected model calls for that
+refresh — since most refreshes only need to rank a handful of new/changed
+reminders thanks to the cache above, this is usually brief.
 
 ### Swipe-to-skip (Today tab)
 
