@@ -1,0 +1,396 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0A4C3365CDF07446DD8CBC26 /* ReminderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E949FF6FFE07CFA88A5BD2 /* ReminderItem.swift */; };
+		2349E4863388B5B5018F4E1E /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2AC825A1025259F56C5FB6 /* HomeView.swift */; };
+		343FBFFD3B9F19578711BB26 /* RemindSortApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF2C2A453EE4B7DF65B8EDF /* RemindSortApp.swift */; };
+		608DE8FE16FDC4F45128185B /* HeuristicRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */; };
+		60D90A54DC63102D7DA97578 /* AIPrioritizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */; };
+		610227B717467D7F3B161F61 /* FlagFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 681ED29CF9EEA7D31746C882 /* FlagFetcher.swift */; };
+		77060C38CC17A7A6EA6BB915 /* ReminderListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81593C39044699CD2DE543DC /* ReminderListView.swift */; };
+		7F45CBEC2A8899CB313E3F34 /* ReminderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D379CACE9591272583679822 /* ReminderRow.swift */; };
+		A19D2430766821FB8F8FBE7B /* RemindersService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 511D33AAA6F009CDCD05DE8F /* RemindersService.swift */; };
+		A6D4B62DAE80FF7A0D815098 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D34B3E7DCE3320A85AFFACC9 /* Assets.xcassets */; };
+		B6CEBB1E11E64A597CB4146F /* RemindersViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9FEBA39830261C3F4FF5A5 /* RemindersViewModel.swift */; };
+		B9237C22FFF221F112D19E85 /* PriorityRanking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628484800D636531B99C0DC6 /* PriorityRanking.swift */; };
+		E683580AD8B500BA4962C1A6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 225BCCE2814045CDF478F095 /* ContentView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		225BCCE2814045CDF478F095 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPrioritizer.swift; sourceTree = "<group>"; };
+		2BF2C2A453EE4B7DF65B8EDF /* RemindSortApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindSortApp.swift; sourceTree = "<group>"; };
+		45E949FF6FFE07CFA88A5BD2 /* ReminderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderItem.swift; sourceTree = "<group>"; };
+		511D33AAA6F009CDCD05DE8F /* RemindersService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersService.swift; sourceTree = "<group>"; };
+		5F9FEBA39830261C3F4FF5A5 /* RemindersViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersViewModel.swift; sourceTree = "<group>"; };
+		628484800D636531B99C0DC6 /* PriorityRanking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriorityRanking.swift; sourceTree = "<group>"; };
+		681ED29CF9EEA7D31746C882 /* FlagFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlagFetcher.swift; sourceTree = "<group>"; };
+		755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeuristicRanker.swift; sourceTree = "<group>"; };
+		81593C39044699CD2DE543DC /* ReminderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderListView.swift; sourceTree = "<group>"; };
+		8CE3597385661620001A2876 /* RemindSort.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RemindSort.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC2AC825A1025259F56C5FB6 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		D34B3E7DCE3320A85AFFACC9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D379CACE9591272583679822 /* ReminderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderRow.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		06DA101B34A17263EBCA954C /* RemindSort */ = {
+			isa = PBXGroup;
+			children = (
+				D34B3E7DCE3320A85AFFACC9 /* Assets.xcassets */,
+				2B752ED6CBB0E3A230969BC1 /* App */,
+				7B758DB30EB371652F8ED9BD /* Models */,
+				363FB685CC7C0B041CFB7926 /* Services */,
+				B8AF08C9777662C82EDFDF62 /* ViewModels */,
+				1F3E4E9E04F99899F2194A7E /* Views */,
+			);
+			path = RemindSort;
+			sourceTree = "<group>";
+		};
+		1F3E4E9E04F99899F2194A7E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				225BCCE2814045CDF478F095 /* ContentView.swift */,
+				BC2AC825A1025259F56C5FB6 /* HomeView.swift */,
+				81593C39044699CD2DE543DC /* ReminderListView.swift */,
+				D379CACE9591272583679822 /* ReminderRow.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		2B752ED6CBB0E3A230969BC1 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				2BF2C2A453EE4B7DF65B8EDF /* RemindSortApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		363FB685CC7C0B041CFB7926 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */,
+				681ED29CF9EEA7D31746C882 /* FlagFetcher.swift */,
+				755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */,
+				511D33AAA6F009CDCD05DE8F /* RemindersService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		7B758DB30EB371652F8ED9BD /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				628484800D636531B99C0DC6 /* PriorityRanking.swift */,
+				45E949FF6FFE07CFA88A5BD2 /* ReminderItem.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		7DDCAEF7D59EEEA4FD02005A = {
+			isa = PBXGroup;
+			children = (
+				06DA101B34A17263EBCA954C /* RemindSort */,
+				B31DB7576AFD4CE0A8D0DF8E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B31DB7576AFD4CE0A8D0DF8E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8CE3597385661620001A2876 /* RemindSort.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B8AF08C9777662C82EDFDF62 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				5F9FEBA39830261C3F4FF5A5 /* RemindersViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		45D02032CE6B69A9652D1277 /* RemindSort */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7D7912CF5061C3B5144D29E2 /* Build configuration list for PBXNativeTarget "RemindSort" */;
+			buildPhases = (
+				E0B591A0E578A71A7B631317 /* Sources */,
+				2215D09244677C816701FDFC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RemindSort;
+			packageProductDependencies = (
+			);
+			productName = RemindSort;
+			productReference = 8CE3597385661620001A2876 /* RemindSort.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1C4EEA44924A32825745D364 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					45D02032CE6B69A9652D1277 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = F486EBA37C33CAE01FEF3EBB /* Build configuration list for PBXProject "RemindSort" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7DDCAEF7D59EEEA4FD02005A;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B31DB7576AFD4CE0A8D0DF8E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				45D02032CE6B69A9652D1277 /* RemindSort */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2215D09244677C816701FDFC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A6D4B62DAE80FF7A0D815098 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E0B591A0E578A71A7B631317 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				60D90A54DC63102D7DA97578 /* AIPrioritizer.swift in Sources */,
+				E683580AD8B500BA4962C1A6 /* ContentView.swift in Sources */,
+				610227B717467D7F3B161F61 /* FlagFetcher.swift in Sources */,
+				608DE8FE16FDC4F45128185B /* HeuristicRanker.swift in Sources */,
+				2349E4863388B5B5018F4E1E /* HomeView.swift in Sources */,
+				B9237C22FFF221F112D19E85 /* PriorityRanking.swift in Sources */,
+				343FBFFD3B9F19578711BB26 /* RemindSortApp.swift in Sources */,
+				0A4C3365CDF07446DD8CBC26 /* ReminderItem.swift in Sources */,
+				77060C38CC17A7A6EA6BB915 /* ReminderListView.swift in Sources */,
+				7F45CBEC2A8899CB313E3F34 /* ReminderRow.swift in Sources */,
+				A19D2430766821FB8F8FBE7B /* RemindersService.swift in Sources */,
+				B6CEBB1E11E64A597CB4146F /* RemindersViewModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		019BAC393570F101F3169835 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		0AF5A85D296C04A85F207843 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		AE1F62B332B8F3930B6FB994 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Generated/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mattbryson.RemindSort;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		B7EB6A43A1CAD998CD724ABB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Generated/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mattbryson.RemindSort;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7D7912CF5061C3B5144D29E2 /* Build configuration list for PBXNativeTarget "RemindSort" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE1F62B332B8F3930B6FB994 /* Debug */,
+				B7EB6A43A1CAD998CD724ABB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F486EBA37C33CAE01FEF3EBB /* Build configuration list for PBXProject "RemindSort" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				019BAC393570F101F3169835 /* Debug */,
+				0AF5A85D296C04A85F207843 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 1C4EEA44924A32825745D364 /* Project object */;
+}
