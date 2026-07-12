@@ -67,10 +67,24 @@ always agree on relative importance.
 
 Ranking is done by Apple's **Foundation Models** framework
 (`SystemLanguageModel` / `LanguageModelSession`), the on-device LLM behind
-Apple Intelligence — no network calls, nothing leaves the device. Each
-reminder gets an **independent urgency score from 0-100** (`AIPrioritizer.swift`,
-`Models/UrgencyScores.swift`), not a relative rank within a batch. For each
-reminder, the model is given:
+Apple Intelligence — no network calls, nothing leaves the device.
+
+**Tiered classification, not raw scoring.** Earlier versions asked the model
+directly for a 0-100 urgency number. In practice this didn't hold up: scores
+clustered near the top of the range, and the model over-weighted incidental
+signals like the explicit priority flag (see below). A raw, well-calibrated
+magnitude estimate turns out to be a harder, less reliable task for a small
+on-device model (~3B parameters) than a coarse categorical judgment. So the
+model's job now is narrower: classify each reminder into one of five urgency
+**tiers** — critical, high, medium, low, minimal (`UrgencyTier` in
+`Models/UrgencyTiers.swift`) — each mapped to a fixed score band (critical =
+90-100, high = 70-89, medium = 45-69, low = 20-44, minimal = 0-19). The final
+0-100 score is then computed in code: reminders sharing a tier are spread
+across that tier's band by the deterministic due-date heuristic, most urgent
+first. The model decides *how urgent, roughly*; code decides *exactly where
+in that ballpark*, using precise date math the model can't reliably do.
+
+For each reminder, the model is given:
 
 - Title and notes
 - Due date and creation date, as **relative offsets from today** ("due in 3
@@ -84,72 +98,41 @@ reminder, the model is given:
 The reminder's explicit priority field (`EKReminder.priority` — the
 none/low/medium/high flag you can set in Reminders.app, read directly via
 EventKit's public API, no scripting involved) is deliberately **not** sent
-to the model. Early testing showed the model weighted it too heavily,
+to the model — an earlier test showed it being weighted too heavily,
 scoring reminders close to 100 just for being marked high-priority even
 when due weeks or months out. Priority is still shown in the UI
-(`PriorityBadge`) and still used by the heuristic fallback (see below); it's
-only excluded from what the AI scoring call sees.
-
-The instructions also include a rough scoring rubric (e.g. "overdue by
-several days → 80-100", "no due date, recently created → 10-30") and
-explicitly ask the model to use the full 0-100 range rather than clustering
-scores near the same value, which it otherwise tends to do.
+(`PriorityBadge`) and still used by the heuristic (both as the classification
+fallback and for within-tier ordering, see below); it's only excluded from
+what the AI classification call sees.
 
 The model's context window can't hold an unlimited number of reminders in one
-call, so scoring is split into chunks of at most 15 (kept deliberately small
-so each reminder gets more individual attention). Because scores are
-absolute rather than relative to a batch, combining chunks afterward is just
-a plain sort by score — no merging separately-ranked batches together, which
-was both slower and a source of bugs in an earlier ordinal-ranking design.
+call, so classification is split into chunks of at most 15 (kept
+deliberately small so each reminder gets more individual attention).
 
-**Two background scoring passes.** After the instant heuristic placeholder,
-new/changed reminders go through two passes, both non-blocking:
-
-1. A **batched** pass (chunks of 15) gives everyone a real AI score
-   reasonably quickly.
-2. An **individual** pass re-scores each reminder completely alone (one per
-   model call) — batching reminders together implicitly invites the model to
-   compare them, which compresses scores toward a narrow band; scoring in
-   isolation avoids that. This is meaningfully slower (one call per
-   reminder) but runs entirely in the background and every result is
-   cached, so it's a one-time cost per reminder.
-
-Verified concretely with a deliberately varied test set (overdue+high-
-priority, due-tomorrow+no-priority, no-due-date+old, etc.): the individual
-pass measurably corrected under-scoring from the batch pass in at least one
-case (a reminder due tomorrow with no explicit priority scored 0 in the
-batch pass, 40 individually) and produced a real spread across the range
-rather than clustering near 100. That same test also surfaced the
-priority-flag over-weighting described above, which led to dropping
-priority from the model's input entirely.
+**A single up-front pass.** Classification happens synchronously, before the
+tabs appear — there's no background refinement step. An earlier version
+split this into a batched pass followed by a slower background per-item pass
+(to counter batching's tendency to compress scores together); that's gone
+now in favor of one straightforward pass, with a loading screen covering it.
 
 If Apple Intelligence isn't available (unsupported hardware, not enabled in
 System Settings, or the on-device model is still downloading), or a given
 model call fails, ranking falls back to a deterministic heuristic score
 (priority level + overdue/due-soon proximity) for the affected reminders —
-the app still works, it just won't be AI-scored, and a small note explains
-why on the Home screen when AI is unavailable entirely.
+the app still works, it just won't be AI-classified, and a small note
+explains why on the Home screen when AI is unavailable entirely. The same
+heuristic also supplies a coarse fallback tier for any reminder the model's
+response happens to omit.
 
-**Placeholder-then-refine scoring.** New or changed reminders (including on
-the very first pass ever, with an empty cache) get an instant heuristic
-placeholder score so nothing ever blocks the UI. The real `UrgencyScores`
-call — the model echoing back each reminder's token alongside its score, so
-mapping the response back to items is unambiguous — then runs as a
-background task and silently updates the UI (via an `onImproved` callback)
-once it finishes.
-
-An earlier version tried a cheaper `QuickScores` pass first (plain integers,
-no per-item token, matched back to items purely by position) to get an
-AI-scored placeholder faster than the full pass. In practice the model
-doesn't reliably return the right *count* of scores without a token
-anchoring each value to a specific reminder — one test batch of 40 items
-came back with 50 scores, all identical. That silently fell back to the
-heuristic anyway (the safety net worked), but paid for a wasted model call
-to get there. `QuickScores` was removed; the heuristic placeholder is used
-directly instead, which is both faster and more honest about what's
-actually happening. Heuristic-derived scores are clamped to the same 0-100
-range as AI scores so a placeholder can never outrank a legitimately-scored
-item by virtue of being unbounded.
+**Known remaining imperfections**, found via a deliberately varied 8-reminder
+test set rather than assumed: a same-day reminder was classified into the
+"low" tier, ranking below a next-day one in "medium" — a plausible tier
+mis-classification, not a placement bug. Separately, the within-tier
+heuristic ordering favors raw overdue duration without an upper bound, which
+let a low-priority reminder overdue by a month outrank a high-priority one
+overdue by less time, even though the tiers themselves were reasonable.
+Worth revisiting either the tier rubric or capping the heuristic's overdue
+bonus if this is still noticeably off in practice.
 
 ### Ranking cache
 
@@ -176,15 +159,12 @@ scoring pass.
 
 ### Loading screen
 
-Since scoring now always returns an instant placeholder (heuristic-derived,
-or cached) rather than blocking on the model, the app never actually needs
-the full-screen progress bar ("Reminders are being processed and sorted…")
-in normal operation — every launch or refresh goes straight to the tabs, and
-real AI scores for new/changed reminders arrive quietly in the background.
-The progress-bar loading state (`LoadState.loading`, gated by
-`AIPrioritizer.isFirstPass()`) is kept as a defensive fallback for any future
-case that does need to block synchronously, but you shouldn't expect to see
-it under normal use.
+Because classification is a single synchronous pass now, `refresh()` always
+shows the full-screen progress bar ("Reminders are being processed and
+sorted…") while it runs. If everything's already cached, `rank(_:)` returns
+essentially instantly and the screen just flashes through; if there's real
+classification work to do, the progress bar tracks actual batch completion
+so it's not just a spinner.
 
 ### Swipe-to-skip (Today tab)
 

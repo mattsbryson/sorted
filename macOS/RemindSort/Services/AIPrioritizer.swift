@@ -13,6 +13,17 @@ struct AIPrioritizer {
     /// diluted across a large batch.
     private static let batchSize = 15
 
+    /// Score range assigned to each tier; reminders within a tier are spread
+    /// across its band by the heuristic (due-date proximity etc.), most
+    /// urgent first.
+    private static let tierBands: [UrgencyTier: ClosedRange<Int>] = [
+        .critical: 90...100,
+        .high: 70...89,
+        .medium: 45...69,
+        .low: 20...44,
+        .minimal: 0...19,
+    ]
+
     static var availability: AIAvailability {
         switch SystemLanguageModel.default.availability {
         case .available:
@@ -28,38 +39,24 @@ struct AIPrioritizer {
         }
     }
 
-    /// True only before the score cache has ever been populated — i.e. this
-    /// would be the very first scoring pass this app has ever done.
-    static func isFirstPass() -> Bool {
-        !ScoreCache.hasAnyCachedScores()
-    }
-
     /// Returns all items ranked from most to least important. `onProgress`
-    /// reports an approximate 0...1 fraction while any synchronous work runs
-    /// (in practice, negligible). `onImproved` (if given) is called on the
-    /// main actor, potentially more than once, as background scoring passes
-    /// produce better-quality scores than what was returned synchronously —
-    /// the caller should treat each call as a live update, not a loading
-    /// state.
+    /// reports an approximate 0...1 fraction while the model classifies
+    /// new/changed reminders — callers should show a loading state for the
+    /// duration of this call, since (unlike an earlier version) nothing
+    /// happens in the background afterward.
     ///
-    /// New or changed reminders (including on the very first pass ever, with
-    /// an empty cache) get an instant heuristic placeholder score so nothing
-    /// ever blocks the UI. Two background passes then refine that, in order:
-    ///
-    /// 1. A batched pass (<=batchSize reminders per call) gives everyone a
-    ///    real AI score reasonably quickly.
-    /// 2. An individual pass (one reminder per call) re-scores each one
-    ///    completely on its own, with no other reminders competing for the
-    ///    model's attention in the same prompt — batching reminders together
-    ///    tends to compress scores toward a narrow band, since the model is
-    ///    implicitly comparing them; scoring alone avoids that bias. This is
-    ///    slower (one model call per reminder) but runs entirely in the
-    ///    background, and every score gets cached, so it's a one-time cost
-    ///    per reminder — unchanged reminders never pay it again.
+    /// Each new/changed reminder is classified by the model into a coarse
+    /// urgency tier (critical/high/medium/low/minimal) rather than asked for
+    /// a fine-grained number directly — categorical judgments are a more
+    /// reliable task for the on-device model. The final 0-100 score is then
+    /// computed in code: reminders sharing a tier are spread across that
+    /// tier's band by the deterministic heuristic, so the coarse AI judgment
+    /// and the precise date-based ordering combine into one score. Already-
+    /// cached reminders are free; if nothing needs classifying, this returns
+    /// immediately with no model call at all.
     func rank(
         _ items: [ReminderItem],
-        onProgress: (@MainActor (Double) -> Void)? = nil,
-        onImproved: (@MainActor ([ReminderItem]) -> Void)? = nil
+        onProgress: (@MainActor (Double) -> Void)? = nil
     ) async -> [ReminderItem] {
         guard !items.isEmpty else {
             await onProgress?(1)
@@ -76,36 +73,67 @@ struct AIPrioritizer {
         let toScore = items.filter { scores[$0.id] == nil }
 
         guard !toScore.isEmpty else {
-            // Everything's already cached — no model call, no background work.
+            // Everything's already cached — no model call.
             await onProgress?(1)
             return sortByScore(items, scores: scores)
         }
 
         let now = Date()
-        for item in toScore {
-            scores[item.id] = clampedScore(HeuristicRanker.score(item, now: now))
+        let tiers = await batchClassify(toScore, onProgress: onProgress)
+        for (id, score) in computeScores(for: toScore, tiers: tiers, now: now) {
+            scores[id] = score
         }
-        let placeholderResult = sortByScore(items, scores: scores)
+
+        ScoreCache.save(items: items, scores: scores)
         await onProgress?(1)
+        return sortByScore(items, scores: scores)
+    }
 
-        Task {
-            // Pass 1: batched — everyone gets a real score reasonably fast.
-            let batched = await batchScore(toScore, batchSize: Self.batchSize, onProgress: nil)
-            var refined = scores
-            for (id, score) in batched { refined[id] = score }
-            ScoreCache.save(items: items, scores: refined)
-            await onImproved?(sortByScore(items, scores: refined))
-
-            // Pass 2: individual — re-score each one alone, free of any
-            // batch-composition bias, refining what pass 1 established.
-            let individual = await batchScore(toScore, batchSize: 1, onProgress: nil)
-            var finalScores = refined
-            for (id, score) in individual { finalScores[id] = score }
-            ScoreCache.save(items: items, scores: finalScores)
-            await onImproved?(sortByScore(items, scores: finalScores))
+    /// Converts tier classifications into concrete 0-100 scores: reminders
+    /// in the same tier are sorted by the heuristic and spread evenly across
+    /// that tier's band, most urgent first. Anything the model didn't
+    /// classify falls back to a heuristic-derived tier.
+    private func computeScores(
+        for items: [ReminderItem],
+        tiers: [String: UrgencyTier],
+        now: Date
+    ) -> [String: Int] {
+        var byTier: [UrgencyTier: [ReminderItem]] = [:]
+        for item in items {
+            let tier = tiers[item.id] ?? heuristicTier(for: item, now: now)
+            byTier[tier, default: []].append(item)
         }
 
-        return placeholderResult
+        var scores: [String: Int] = [:]
+        for tier in UrgencyTier.allCases {
+            guard let group = byTier[tier], !group.isEmpty else { continue }
+            guard let band = Self.tierBands[tier] else { continue }
+
+            let sorted = group.sorted { HeuristicRanker.score($0, now: now) > HeuristicRanker.score($1, now: now) }
+            if sorted.count == 1 {
+                scores[sorted[0].id] = band.upperBound
+                continue
+            }
+            let span = Double(band.upperBound - band.lowerBound)
+            for (index, item) in sorted.enumerated() {
+                // 1.0 for the most urgent in the tier, 0.0 for the least.
+                let fraction = Double(sorted.count - 1 - index) / Double(sorted.count - 1)
+                scores[item.id] = Int((Double(band.lowerBound) + fraction * span).rounded())
+            }
+        }
+        return scores
+    }
+
+    /// Coarse fallback tier derived purely from the heuristic, used only
+    /// when the model omits a reminder from its response.
+    private func heuristicTier(for item: ReminderItem, now: Date) -> UrgencyTier {
+        switch HeuristicRanker.score(item, now: now) {
+        case 130...: .critical
+        case 80..<130: .high
+        case 40..<80: .medium
+        case 10..<40: .low
+        default: .minimal
+        }
     }
 
     private func sortByScore(_ items: [ReminderItem], scores: [String: Int]) -> [ReminderItem] {
@@ -128,42 +156,40 @@ struct AIPrioritizer {
         }
     }
 
-    /// Heuristic scores aren't bounded the way AI scores are (a very overdue
-    /// item can score well past 100), so anything derived from the heuristic
-    /// gets clamped to the same 0-100 range the model uses — otherwise a
-    /// heuristic placeholder could outrank a legitimately-scored AI item.
+    /// Heuristic scores aren't bounded the way tier bands are (a very
+    /// overdue item can score well past 100), so anything derived straight
+    /// from the heuristic gets clamped to 0-100 for consistency.
     private func clampedScore(_ raw: Double) -> Int {
         min(100, max(0, Int(raw)))
     }
 
-    /// Splits items into <=chunkSize chunks and scores each with the model,
-    /// reporting progress across all chunks.
-    private func batchScore(
+    /// Splits items into <=batchSize chunks and classifies each with the
+    /// model, reporting progress across all chunks.
+    private func batchClassify(
         _ items: [ReminderItem],
-        batchSize chunkSize: Int,
         onProgress: (@MainActor (Double) -> Void)?
-    ) async -> [String: Int] {
+    ) async -> [String: UrgencyTier] {
         guard !items.isEmpty else { return [:] }
-        let totalBatches = max(1, Int((Double(items.count) / Double(chunkSize)).rounded(.up)))
+        let totalBatches = max(1, Int((Double(items.count) / Double(Self.batchSize)).rounded(.up)))
         let tracker = ProgressTracker(estimatedCalls: totalBatches, onProgress: onProgress)
         let preSorted = HeuristicRanker.sort(items)
 
-        var result: [String: Int] = [:]
-        for start in stride(from: 0, to: preSorted.count, by: chunkSize) {
-            let chunk = Array(preSorted[start..<min(start + chunkSize, preSorted.count)])
-            let batchScores = await scoreWithModel(chunk)
-            for (id, score) in batchScores {
-                result[id] = score
+        var result: [String: UrgencyTier] = [:]
+        for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
+            let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
+            let batchTiers = await classifyWithModel(chunk)
+            for (id, tier) in batchTiers {
+                result[id] = tier
             }
             await tracker.advance()
         }
         return result
     }
 
-    /// The model echoes back each reminder's token alongside its score, so
+    /// The model echoes back each reminder's token alongside its tier, so
     /// mapping back to items is unambiguous even if the model reorders or
     /// omits entries.
-    private func scoreWithModel(_ batch: [ReminderItem]) async -> [String: Int] {
+    private func classifyWithModel(_ batch: [ReminderItem]) async -> [String: UrgencyTier] {
         let now = Date()
         let lines = batch.enumerated().map { index, item in
             formatLine(token: "R\(index)", item: item, now: now)
@@ -171,20 +197,13 @@ struct AIPrioritizer {
 
         let session = LanguageModelSession(
             instructions: """
-            You rate a person's reminders (to-dos) on an urgency/importance scale \
-            from 0 to 100, where 100 is extremely urgent or important and 0 is not \
-            urgent at all. Each reminder's due date and creation date are given as \
-            relative offsets from today (e.g. "due in 3 days", "overdue by 12 days", \
-            "created 45 days ago") — use these directly rather than estimating dates \
-            yourself. As a rough guide: a reminder overdue by more than a few days, \
-            or due very soon with real stakes evident from its title or notes, \
-            should score 80-100; a reminder due within the next week or two should \
-            score 40-70; a reminder with no due date, created recently, should score \
-            10-30, trending higher the longer it has sat untouched so it doesn't get \
-            perpetually neglected. Use the title, notes, and list/project to judge \
-            real-world stakes and urgency — use the full 0-100 range rather than \
-            clustering everything near the same value. Respond only with the \
-            requested scores.
+            You classify a person's reminders (to-dos) into urgency tiers: \
+            critical, high, medium, low, or minimal. Each reminder's due date \
+            and creation date are given as relative offsets from today (e.g. \
+            "due in 3 days", "overdue by 12 days", "created 45 days ago") — use \
+            these directly rather than estimating dates yourself. Use the title, \
+            notes, and list/project to judge real-world stakes too. Respond only \
+            with the requested tier classifications.
             """
         )
 
@@ -194,23 +213,23 @@ struct AIPrioritizer {
         }
 
         do {
-            let prompt = "Score these reminders' urgency from 0-100:\n" + lines.joined(separator: "\n")
-            let response = try await session.respond(to: prompt, generating: UrgencyScores.self)
+            let prompt = "Classify these reminders' urgency:\n" + lines.joined(separator: "\n")
+            let response = try await session.respond(to: prompt, generating: UrgencyTiers.self)
 
-            var result: [String: Int] = [:]
-            for entry in response.content.scores {
+            var result: [String: UrgencyTier] = [:]
+            for entry in response.content.tiers {
                 if let id = tokenToID[entry.token] {
-                    result[id] = min(100, max(0, entry.score))
+                    result[id] = entry.tier
                 }
             }
             for item in batch where result[item.id] == nil {
-                result[item.id] = clampedScore(HeuristicRanker.score(item, now: now))
+                result[item.id] = heuristicTier(for: item, now: now)
             }
             return result
         } catch {
-            var result: [String: Int] = [:]
+            var result: [String: UrgencyTier] = [:]
             for item in batch {
-                result[item.id] = clampedScore(HeuristicRanker.score(item, now: now))
+                result[item.id] = heuristicTier(for: item, now: now)
             }
             return result
         }

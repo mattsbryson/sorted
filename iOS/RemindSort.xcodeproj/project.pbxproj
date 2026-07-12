@@ -19,15 +19,14 @@
 		8592B4672B7F0EA9DD989F49 /* SnoozeUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A47729FDED1EB0650BAF7375 /* SnoozeUnit.swift */; };
 		8CAAF7F19B3F3053B60C568E /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F892AB6A697A3E8F90AFAF4 /* AppSettings.swift */; };
 		A19D2430766821FB8F8FBE7B /* RemindersService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 511D33AAA6F009CDCD05DE8F /* RemindersService.swift */; };
+		A6D14A78F41718A9339F91A2 /* UrgencyTiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB2D21559C810AFBFE77E70 /* UrgencyTiers.swift */; };
 		A6D4B62DAE80FF7A0D815098 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D34B3E7DCE3320A85AFFACC9 /* Assets.xcassets */; };
-		B56AFA907A8EC6706F3ADF3C /* UrgencyScores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7844C8790BC2D038FCA6B4 /* UrgencyScores.swift */; };
 		B6CEBB1E11E64A597CB4146F /* RemindersViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9FEBA39830261C3F4FF5A5 /* RemindersViewModel.swift */; };
 		E683580AD8B500BA4962C1A6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 225BCCE2814045CDF478F095 /* ContentView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		03CC70D80E0CDD7A45B0D1F3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		0A7844C8790BC2D038FCA6B4 /* UrgencyScores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrgencyScores.swift; sourceTree = "<group>"; };
 		225BCCE2814045CDF478F095 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPrioritizer.swift; sourceTree = "<group>"; };
 		2BF2C2A453EE4B7DF65B8EDF /* RemindSortApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindSortApp.swift; sourceTree = "<group>"; };
@@ -38,6 +37,7 @@
 		755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeuristicRanker.swift; sourceTree = "<group>"; };
 		81593C39044699CD2DE543DC /* ReminderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderListView.swift; sourceTree = "<group>"; };
 		8CE3597385661620001A2876 /* RemindSort.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RemindSort.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8FB2D21559C810AFBFE77E70 /* UrgencyTiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrgencyTiers.swift; sourceTree = "<group>"; };
 		9F892AB6A697A3E8F90AFAF4 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		A47729FDED1EB0650BAF7375 /* SnoozeUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoozeUnit.swift; sourceTree = "<group>"; };
 		BC2AC825A1025259F56C5FB6 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -95,7 +95,7 @@
 			children = (
 				45E949FF6FFE07CFA88A5BD2 /* ReminderItem.swift */,
 				A47729FDED1EB0650BAF7375 /* SnoozeUnit.swift */,
-				0A7844C8790BC2D038FCA6B4 /* UrgencyScores.swift */,
+				8FB2D21559C810AFBFE77E70 /* UrgencyTiers.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -209,7 +209,7 @@
 				7CD287C4838EE6E707A0D4B5 /* ScoreCache.swift in Sources */,
 				3F0ACFD9105BCE242456E694 /* SettingsView.swift in Sources */,
 				8592B4672B7F0EA9DD989F49 /* SnoozeUnit.swift in Sources */,
-				B56AFA907A8EC6706F3ADF3C /* UrgencyScores.swift in Sources */,
+				A6D14A78F41718A9339F91A2 /* UrgencyTiers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
