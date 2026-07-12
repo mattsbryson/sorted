@@ -4,6 +4,7 @@ struct HomeView: View {
     @Environment(RemindersViewModel.self) private var viewModel
     @State private var showingDeleteConfirmation = false
     @State private var showingSnoozePopover = false
+    @State private var showingSettings = false
     @State private var snoozeAmount = 1
     @State private var snoozeUnit: SnoozeUnit = .day
 
@@ -13,11 +14,21 @@ struct HomeView: View {
                 .toolbar {
                     ToolbarItem(placement: .automatic) {
                         Button {
+                            showingSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                        }
+                    }
+                    ToolbarItem(placement: .automatic) {
+                        Button {
                             Task { await viewModel.refresh() }
                         } label: {
                             Image(systemName: "arrow.clockwise")
                         }
                     }
+                }
+                .sheet(isPresented: $showingSettings) {
+                    SettingsView()
                 }
         }
     }
@@ -137,6 +148,7 @@ private struct SnoozePopover: View {
 }
 
 private struct ReminderCard: View {
+    @Environment(AppSettings.self) private var settings
     let reminder: ReminderItem
 
     var body: some View {
@@ -148,6 +160,9 @@ private struct ReminderCard: View {
                     .padding(.vertical, 3)
                     .background(.tertiary, in: Capsule())
                 Spacer()
+                if settings.showUrgencyScore, let score = reminder.score {
+                    UrgencyScoreBadge(score: score)
+                }
                 PriorityBadge(level: reminder.priorityLevel)
             }
 

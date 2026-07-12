@@ -8,6 +8,7 @@ struct RemindSortApp: App {
         WindowGroup {
             ContentView()
                 .environment(viewModel)
+                .environment(viewModel.settings)
         }
     }
 }

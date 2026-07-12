@@ -22,11 +22,27 @@ struct ReminderItem: Identifiable, Hashable, Sendable {
     let rawPriority: Int
     let listName: String
     let creationDate: Date?
+    /// The AI (or heuristic-fallback) urgency score, 0-100, that determined
+    /// this item's position in the ranked list. nil until scoring completes.
+    let score: Int?
 
     var priorityLevel: ReminderPriorityLevel { ReminderPriorityLevel(rawPriority: rawPriority) }
 
     var isOverdue: Bool {
         guard let dueDate else { return false }
         return dueDate < Date() && !Calendar.current.isDateInToday(dueDate)
+    }
+
+    func withScore(_ score: Int?) -> ReminderItem {
+        ReminderItem(
+            id: id,
+            title: title,
+            notes: notes,
+            dueDate: dueDate,
+            rawPriority: rawPriority,
+            listName: listName,
+            creationDate: creationDate,
+            score: score
+        )
     }
 }

@@ -10,12 +10,14 @@
 		0A4C3365CDF07446DD8CBC26 /* ReminderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E949FF6FFE07CFA88A5BD2 /* ReminderItem.swift */; };
 		2349E4863388B5B5018F4E1E /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2AC825A1025259F56C5FB6 /* HomeView.swift */; };
 		343FBFFD3B9F19578711BB26 /* RemindSortApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF2C2A453EE4B7DF65B8EDF /* RemindSortApp.swift */; };
+		3F0ACFD9105BCE242456E694 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03CC70D80E0CDD7A45B0D1F3 /* SettingsView.swift */; };
 		608DE8FE16FDC4F45128185B /* HeuristicRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */; };
 		60D90A54DC63102D7DA97578 /* AIPrioritizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */; };
 		77060C38CC17A7A6EA6BB915 /* ReminderListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81593C39044699CD2DE543DC /* ReminderListView.swift */; };
 		7CD287C4838EE6E707A0D4B5 /* ScoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62ABB71E9CEDDBCBD48D4D5D /* ScoreCache.swift */; };
 		7F45CBEC2A8899CB313E3F34 /* ReminderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D379CACE9591272583679822 /* ReminderRow.swift */; };
 		8592B4672B7F0EA9DD989F49 /* SnoozeUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A47729FDED1EB0650BAF7375 /* SnoozeUnit.swift */; };
+		8CAAF7F19B3F3053B60C568E /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F892AB6A697A3E8F90AFAF4 /* AppSettings.swift */; };
 		A19D2430766821FB8F8FBE7B /* RemindersService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 511D33AAA6F009CDCD05DE8F /* RemindersService.swift */; };
 		A6D4B62DAE80FF7A0D815098 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D34B3E7DCE3320A85AFFACC9 /* Assets.xcassets */; };
 		B56AFA907A8EC6706F3ADF3C /* UrgencyScores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7844C8790BC2D038FCA6B4 /* UrgencyScores.swift */; };
@@ -24,6 +26,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		03CC70D80E0CDD7A45B0D1F3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0A7844C8790BC2D038FCA6B4 /* UrgencyScores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrgencyScores.swift; sourceTree = "<group>"; };
 		225BCCE2814045CDF478F095 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPrioritizer.swift; sourceTree = "<group>"; };
@@ -34,7 +37,8 @@
 		62ABB71E9CEDDBCBD48D4D5D /* ScoreCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreCache.swift; sourceTree = "<group>"; };
 		755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeuristicRanker.swift; sourceTree = "<group>"; };
 		81593C39044699CD2DE543DC /* ReminderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderListView.swift; sourceTree = "<group>"; };
-		8CE3597385661620001A2876 /* RemindSort.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RemindSort.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CE3597385661620001A2876 /* RemindSort.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RemindSort.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9F892AB6A697A3E8F90AFAF4 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		A47729FDED1EB0650BAF7375 /* SnoozeUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoozeUnit.swift; sourceTree = "<group>"; };
 		BC2AC825A1025259F56C5FB6 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		D34B3E7DCE3320A85AFFACC9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -62,6 +66,7 @@
 				BC2AC825A1025259F56C5FB6 /* HomeView.swift */,
 				81593C39044699CD2DE543DC /* ReminderListView.swift */,
 				D379CACE9591272583679822 /* ReminderRow.swift */,
+				03CC70D80E0CDD7A45B0D1F3 /* SettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -114,6 +119,7 @@
 		B8AF08C9777662C82EDFDF62 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				9F892AB6A697A3E8F90AFAF4 /* AppSettings.swift */,
 				5F9FEBA39830261C3F4FF5A5 /* RemindersViewModel.swift */,
 			);
 			path = ViewModels;
@@ -190,6 +196,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				60D90A54DC63102D7DA97578 /* AIPrioritizer.swift in Sources */,
+				8CAAF7F19B3F3053B60C568E /* AppSettings.swift in Sources */,
 				E683580AD8B500BA4962C1A6 /* ContentView.swift in Sources */,
 				608DE8FE16FDC4F45128185B /* HeuristicRanker.swift in Sources */,
 				2349E4863388B5B5018F4E1E /* HomeView.swift in Sources */,
@@ -200,6 +207,7 @@
 				A19D2430766821FB8F8FBE7B /* RemindersService.swift in Sources */,
 				B6CEBB1E11E64A597CB4146F /* RemindersViewModel.swift in Sources */,
 				7CD287C4838EE6E707A0D4B5 /* ScoreCache.swift in Sources */,
+				3F0ACFD9105BCE242456E694 /* SettingsView.swift in Sources */,
 				8592B4672B7F0EA9DD989F49 /* SnoozeUnit.swift in Sources */,
 				B56AFA907A8EC6706F3ADF3C /* UrgencyScores.swift in Sources */,
 			);
@@ -335,7 +343,6 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = A9K8GZ46Y9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;
@@ -360,7 +367,6 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = A9K8GZ46Y9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;

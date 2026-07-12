@@ -24,7 +24,30 @@ struct PriorityBadge: View {
     }
 }
 
+struct UrgencyScoreBadge: View {
+    let score: Int
+
+    var body: some View {
+        Text("\(score)")
+            .font(.caption2.weight(.semibold))
+            .monospacedDigit()
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.18), in: Capsule())
+            .foregroundStyle(color)
+    }
+
+    private var color: Color {
+        switch score {
+        case 67...100: .red
+        case 34...66: .orange
+        default: .blue
+        }
+    }
+}
+
 struct ReminderRow: View {
+    @Environment(AppSettings.self) private var settings
     let reminder: ReminderItem
     var onComplete: () -> Void
     var onDelete: () -> Void
@@ -44,6 +67,9 @@ struct ReminderRow: View {
                 HStack(spacing: 6) {
                     Text(reminder.title)
                         .font(.body)
+                    if settings.showUrgencyScore, let score = reminder.score {
+                        UrgencyScoreBadge(score: score)
+                    }
                     PriorityBadge(level: reminder.priorityLevel)
                 }
 

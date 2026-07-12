@@ -97,9 +97,15 @@ struct AIPrioritizer {
         let heuristicOrder = HeuristicRanker.sort(items)
         let heuristicIndex = Dictionary(uniqueKeysWithValues: heuristicOrder.enumerated().map { ($1.id, $0) })
 
-        return items.sorted { a, b in
-            let scoreA = scores[a.id] ?? clampedScore(HeuristicRanker.score(a, now: now))
-            let scoreB = scores[b.id] ?? clampedScore(HeuristicRanker.score(b, now: now))
+        // Attach the score that actually determined each item's position, so
+        // it's available for display (e.g. a "show urgency score" setting).
+        let withScores = items.map { item in
+            item.withScore(scores[item.id] ?? clampedScore(HeuristicRanker.score(item, now: now)))
+        }
+
+        return withScores.sorted { a, b in
+            let scoreA = a.score ?? 0
+            let scoreB = b.score ?? 0
             if scoreA != scoreB { return scoreA > scoreB }
             // Stable tie-break so equal scores don't jump around between runs.
             return (heuristicIndex[a.id] ?? .max) < (heuristicIndex[b.id] ?? .max)
@@ -152,7 +158,10 @@ struct AIPrioritizer {
             from 0 to 100, where 100 is extremely urgent or important and 0 is not \
             urgent at all. Weigh due date (overdue and soon-due items are usually \
             more urgent), the reminder's explicit priority level if set, and which \
-            list/project it belongs to. Use the title and notes to judge real-world \
+            list/project it belongs to. Also consider how long ago each reminder \
+            was created — a reminder that has sat untouched for a long time may \
+            deserve a boost so it doesn't get perpetually neglected, especially if \
+            it has no due date at all. Use the title and notes to judge real-world \
             stakes and urgency too. Give each reminder its own independent score \
             reflecting its true urgency, not just a relative rank — multiple \
             reminders can and should share similar scores if they're similarly \
@@ -197,6 +206,10 @@ struct AIPrioritizer {
             parts.append("overdue=\(item.isOverdue)")
         } else {
             parts.append("due=none")
+        }
+
+        if let created = item.creationDate {
+            parts.append("created=\(Self.dateFormatter.string(from: created))")
         }
 
         parts.append("priority=\(item.priorityLevel.rawValue)")

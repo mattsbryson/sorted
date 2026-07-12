@@ -44,7 +44,8 @@ final class RemindersService {
                         dueDate: r.dueDateComponents?.date,
                         rawPriority: Int(r.priority),
                         listName: r.calendar?.title ?? "Reminders",
-                        creationDate: r.creationDate
+                        creationDate: r.creationDate,
+                        score: nil
                     )
                 }
                 continuation.resume(returning: items)

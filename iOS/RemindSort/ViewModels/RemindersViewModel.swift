@@ -19,6 +19,8 @@ final class RemindersViewModel {
     private(set) var aiNote: String?
     private(set) var rankingProgress: Double = 0
 
+    let settings = AppSettings()
+
     private let remindersService = RemindersService()
     private let prioritizer = AIPrioritizer()
 
@@ -27,16 +29,15 @@ final class RemindersViewModel {
         return rankedReminders[homeIndex]
     }
 
-    private static let todayLimit = 5
-
     /// IDs swiped away in the Today tab for this session only (not completed or
     /// deleted in Reminders) so the next-ranked item takes their place.
     private var skippedTodayIDs: Set<String> = []
 
     /// Today is capped to the top N most important items (already AI-ranked order,
-    /// minus anything swiped away this session); Upcoming/Someday remain uncapped.
+    /// minus anything swiped away this session); the limit is user-configurable
+    /// in Settings. Upcoming/Someday remain uncapped.
     var todayItems: [ReminderItem] {
-        Array(bucket(.today).filter { !skippedTodayIDs.contains($0.id) }.prefix(Self.todayLimit))
+        Array(bucket(.today).filter { !skippedTodayIDs.contains($0.id) }.prefix(settings.todayLimit))
     }
     var upcomingItems: [ReminderItem] { bucket(.upcoming) }
     var somedayItems: [ReminderItem] { bucket(.someday) }
@@ -130,7 +131,8 @@ final class RemindersViewModel {
                     dueDate: newDate,
                     rawPriority: item.rawPriority,
                     listName: item.listName,
-                    creationDate: item.creationDate
+                    creationDate: item.creationDate,
+                    score: item.score
                 )
             }
             if homeIndex >= rankedReminders.count {

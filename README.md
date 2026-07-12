@@ -44,10 +44,21 @@ cd macOS && xcodegen generate   # or: cd iOS && xcodegen generate
     confirmation prompt), and advances to the next one. Deleted reminders
     land in Reminders.app's own "Recently Deleted" list, same as deleting
     them there directly.
-- **Today** — the top 5 most important reminders that are due today or
-  overdue, in ranked order.
+- **Today** — the top *N* most important reminders that are due today or
+  overdue, in ranked order (*N* is 5 by default, configurable in Settings).
 - **Upcoming** — all reminders with a future due date, in ranked order.
 - **Someday** — all reminders with no due date at all, in ranked order.
+
+### Settings
+
+A gear icon in Home's toolbar opens Settings (`AppSettings.swift`, persisted
+via `UserDefaults`):
+
+- **Reminders shown in Today** — a stepper, 1-20, controlling the cap
+  described above.
+- **Show urgency score** — a toggle that displays each reminder's 0-100
+  urgency score as a colored badge (red 67+, orange 34-66, blue below) next
+  to its priority badge, on Home and in the list tabs.
 
 All four tabs draw from one shared ranking pass, so Home and the tab buckets
 always agree on relative importance.
@@ -63,6 +74,8 @@ reminder, the model is given:
 
 - Title and notes
 - Due date (and whether it's overdue)
+- Creation date (so long-neglected reminders, especially ones with no due
+  date, can be weighed instead of sitting forgotten forever)
 - The reminder's explicit priority field (High / Medium / Low / None)
 - Which Reminders list it belongs to
 
