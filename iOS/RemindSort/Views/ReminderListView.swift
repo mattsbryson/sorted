@@ -5,6 +5,10 @@ struct ReminderListView: View {
 
     let title: String
     let items: [ReminderItem]
+    /// When set, rows can be swiped from the leading edge to skip them
+    /// (session-only — doesn't touch Reminders — and lets the next-ranked
+    /// item take their place). Used for the Today tab.
+    var onSkip: ((ReminderItem) -> Void)? = nil
 
     var body: some View {
         NavigationStack {
@@ -22,6 +26,16 @@ struct ReminderListView: View {
                                 Task { await viewModel.complete(item) }
                             } onDelete: {
                                 Task { await viewModel.delete(item) }
+                            }
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                if let onSkip {
+                                    Button {
+                                        onSkip(item)
+                                    } label: {
+                                        Label("Skip", systemImage: "arrow.uturn.forward.circle")
+                                    }
+                                    .tint(.blue)
+                                }
                             }
                         }
                     }

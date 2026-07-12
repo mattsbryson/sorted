@@ -27,8 +27,10 @@ struct ContentView: View {
             HomeView()
                 .tabItem { Label("Home", systemImage: "star.fill") }
 
-            ReminderListView(title: "Today", items: viewModel.todayItems)
-                .tabItem { Label("Today", systemImage: "sun.max.fill") }
+            ReminderListView(title: "Today", items: viewModel.todayItems) { item in
+                viewModel.skipToday(item)
+            }
+            .tabItem { Label("Today", systemImage: "sun.max.fill") }
 
             ReminderListView(title: "Upcoming", items: viewModel.upcomingItems)
                 .tabItem { Label("Upcoming", systemImage: "calendar") }

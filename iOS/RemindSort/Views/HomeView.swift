@@ -23,31 +23,37 @@ struct HomeView: View {
 
                     ReminderCard(reminder: reminder)
 
-                    HStack(spacing: 16) {
+                    VStack(spacing: 12) {
                         Button {
                             Task { await viewModel.complete(reminder) }
                         } label: {
                             Label("Complete", systemImage: "checkmark.circle.fill")
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
 
-                        Button {
-                            viewModel.skipHome()
-                        } label: {
-                            Label("Skip", systemImage: "arrow.uturn.forward.circle")
-                        }
-                        .buttonStyle(.bordered)
+                        HStack(spacing: 12) {
+                            Button {
+                                viewModel.skipHome()
+                            } label: {
+                                Label("Skip", systemImage: "arrow.uturn.forward.circle")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
 
-                        Button(role: .destructive) {
-                            showingDeleteConfirmation = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                            Button(role: .destructive) {
+                                showingDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
                     }
-                    .controlSize(.large)
                 }
-                .padding(32)
+                .padding(24)
                 .frame(maxWidth: 420)
                 .confirmationDialog(
                     "Delete “\(reminder.title)”?",

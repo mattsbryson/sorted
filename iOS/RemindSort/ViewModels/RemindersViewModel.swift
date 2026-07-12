@@ -28,9 +28,15 @@ final class RemindersViewModel {
 
     private static let todayLimit = 5
 
-    /// Today is capped to the top N most important items (already AI-ranked order);
-    /// Upcoming/Someday remain uncapped.
-    var todayItems: [ReminderItem] { Array(bucket(.today).prefix(Self.todayLimit)) }
+    /// IDs swiped away in the Today tab for this session only (not completed or
+    /// deleted in Reminders) so the next-ranked item takes their place.
+    private var skippedTodayIDs: Set<String> = []
+
+    /// Today is capped to the top N most important items (already AI-ranked order,
+    /// minus anything swiped away this session); Upcoming/Someday remain uncapped.
+    var todayItems: [ReminderItem] {
+        Array(bucket(.today).filter { !skippedTodayIDs.contains($0.id) }.prefix(Self.todayLimit))
+    }
     var upcomingItems: [ReminderItem] { bucket(.upcoming) }
     var somedayItems: [ReminderItem] { bucket(.someday) }
 
@@ -59,6 +65,7 @@ final class RemindersViewModel {
             let items = try await remindersService.fetchIncompleteReminders()
             rankedReminders = await prioritizer.rank(items)
             homeIndex = 0
+            skippedTodayIDs.removeAll()
             loadState = .loaded
         } catch {
             loadState = .error(error.localizedDescription)
@@ -68,6 +75,10 @@ final class RemindersViewModel {
     func skipHome() {
         guard !rankedReminders.isEmpty else { return }
         homeIndex = (homeIndex + 1) % rankedReminders.count
+    }
+
+    func skipToday(_ item: ReminderItem) {
+        skippedTodayIDs.insert(item.id)
     }
 
     func complete(_ item: ReminderItem) async {
