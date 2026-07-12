@@ -36,7 +36,7 @@
 		62ABB71E9CEDDBCBD48D4D5D /* ScoreCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreCache.swift; sourceTree = "<group>"; };
 		755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeuristicRanker.swift; sourceTree = "<group>"; };
 		81593C39044699CD2DE543DC /* ReminderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderListView.swift; sourceTree = "<group>"; };
-		8CE3597385661620001A2876 /* RemindSort.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RemindSort.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CE3597385661620001A2876 /* RemindSort.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RemindSort.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8FB2D21559C810AFBFE77E70 /* UrgencyTiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrgencyTiers.swift; sourceTree = "<group>"; };
 		9F892AB6A697A3E8F90AFAF4 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		A47729FDED1EB0650BAF7375 /* SnoozeUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoozeUnit.swift; sourceTree = "<group>"; };
@@ -343,6 +343,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A9K8GZ46Y9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;
@@ -367,6 +368,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A9K8GZ46Y9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;

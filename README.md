@@ -134,6 +134,15 @@ overdue by less time, even though the tiers themselves were reasonable.
 Worth revisiting either the tier rubric or capping the heuristic's overdue
 bonus if this is still noticeably off in practice.
 
+**Status: ranking quality is still under active reconsideration.** Tiered
+classification (this section) is the current approach and is a real
+improvement over raw 0-100 scoring, but it hasn't converged on something
+fully satisfying yet — the two issues above are illustrative, not
+necessarily exhaustive. Before extending or further tuning this system
+(rubric wording, tier bands, the heuristic formula, or a different approach
+altogether), check in on direction rather than assuming the current design
+is settled.
+
 ### Ranking cache
 
 Running the on-device model takes several seconds, so each reminder's score
