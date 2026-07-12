@@ -27,26 +27,28 @@ struct AIPrioritizer {
     }
 
     /// True only before the score cache has ever been populated — i.e. this
-    /// would be the very first scoring pass this app has ever done. Used to
-    /// decide whether to show a blocking loading screen at all.
+    /// would be the very first scoring pass this app has ever done.
     static func isFirstPass() -> Bool {
         !ScoreCache.hasAnyCachedScores()
     }
 
     /// Returns all items ranked from most to least important. `onProgress`
-    /// reports an approximate 0...1 fraction while a synchronous scoring pass
-    /// is running. `onImproved` (if given) is called later, on the main
-    /// actor, if a background refinement pass produces a better-quality
-    /// ordering than what was returned synchronously — the caller should
-    /// treat that as a live update, not a loading state.
+    /// reports an approximate 0...1 fraction while any synchronous work runs
+    /// (in practice, negligible — see below). `onImproved` (if given) is
+    /// called later, on the main actor, once a background scoring pass
+    /// produces real AI-derived scores for anything that only had a
+    /// heuristic placeholder — the caller should treat that as a live
+    /// update, not a loading state.
     ///
-    /// - On the very first pass ever (empty cache), everything is quickly
-    ///   scored with a cheap, low-detail model call so something reasonable
-    ///   appears immediately, then re-scored properly in the background.
-    /// - On every later pass, only new/changed reminders need scoring at
-    ///   all; already-cached ones are free. New/changed reminders get an
-    ///   instant heuristic placeholder score so nothing ever blocks the UI,
-    ///   then the real model score arrives via `onImproved` shortly after.
+    /// New or changed reminders (including on the very first pass ever, with
+    /// an empty cache) get an instant heuristic placeholder score so nothing
+    /// ever blocks the UI; the real model score for those reminders arrives
+    /// via `onImproved` shortly after, from a background task. An earlier
+    /// version tried a cheaper "quick" AI pass first instead of the
+    /// heuristic placeholder, but the model doesn't reliably return the
+    /// right number of scores without a per-item token to anchor each value
+    /// to a specific reminder, making it worse than just using the
+    /// heuristic directly.
     func rank(
         _ items: [ReminderItem],
         onProgress: (@MainActor (Double) -> Void)? = nil,
@@ -72,39 +74,22 @@ struct AIPrioritizer {
             return sortByScore(items, scores: scores)
         }
 
-        if Self.isFirstPass() {
-            let quick = await batchScore(toScore, using: quickScoreWithModel, onProgress: onProgress)
-            for (id, score) in quick { scores[id] = score }
-            ScoreCache.save(items: items, scores: scores)
-            let quickResult = sortByScore(items, scores: scores)
-
-            Task {
-                let thorough = await batchScore(toScore, using: thoroughScoreWithModel, onProgress: nil)
-                var refined = scores
-                for (id, score) in thorough { refined[id] = score }
-                ScoreCache.save(items: items, scores: refined)
-                await onImproved?(sortByScore(items, scores: refined))
-            }
-
-            return quickResult
-        } else {
-            let now = Date()
-            for item in toScore {
-                scores[item.id] = Int(HeuristicRanker.score(item, now: now))
-            }
-            let placeholderResult = sortByScore(items, scores: scores)
-            await onProgress?(1)
-
-            Task {
-                let thorough = await batchScore(toScore, using: thoroughScoreWithModel, onProgress: nil)
-                var refined = scores
-                for (id, score) in thorough { refined[id] = score }
-                ScoreCache.save(items: items, scores: refined)
-                await onImproved?(sortByScore(items, scores: refined))
-            }
-
-            return placeholderResult
+        let now = Date()
+        for item in toScore {
+            scores[item.id] = clampedScore(HeuristicRanker.score(item, now: now))
         }
+        let placeholderResult = sortByScore(items, scores: scores)
+        await onProgress?(1)
+
+        Task {
+            let thorough = await batchScore(toScore, using: thoroughScoreWithModel, onProgress: nil)
+            var refined = scores
+            for (id, score) in thorough { refined[id] = score }
+            ScoreCache.save(items: items, scores: refined)
+            await onImproved?(sortByScore(items, scores: refined))
+        }
+
+        return placeholderResult
     }
 
     private func sortByScore(_ items: [ReminderItem], scores: [String: Int]) -> [ReminderItem] {
@@ -113,12 +98,20 @@ struct AIPrioritizer {
         let heuristicIndex = Dictionary(uniqueKeysWithValues: heuristicOrder.enumerated().map { ($1.id, $0) })
 
         return items.sorted { a, b in
-            let scoreA = scores[a.id] ?? Int(HeuristicRanker.score(a, now: now))
-            let scoreB = scores[b.id] ?? Int(HeuristicRanker.score(b, now: now))
+            let scoreA = scores[a.id] ?? clampedScore(HeuristicRanker.score(a, now: now))
+            let scoreB = scores[b.id] ?? clampedScore(HeuristicRanker.score(b, now: now))
             if scoreA != scoreB { return scoreA > scoreB }
             // Stable tie-break so equal scores don't jump around between runs.
             return (heuristicIndex[a.id] ?? .max) < (heuristicIndex[b.id] ?? .max)
         }
+    }
+
+    /// Heuristic scores aren't bounded the way AI scores are (a very overdue
+    /// item can score well past 100), so anything derived from the heuristic
+    /// gets clamped to the same 0-100 range the model uses — otherwise a
+    /// heuristic placeholder could outrank a legitimately-scored AI item.
+    private func clampedScore(_ raw: Double) -> Int {
+        min(100, max(0, Int(raw)))
     }
 
     /// Splits items into <=batchSize chunks and scores each with the given
@@ -145,9 +138,9 @@ struct AIPrioritizer {
         return result
     }
 
-    /// The full, more explicit scoring call: the model echoes back each
-    /// reminder's token alongside its score, so mapping back to items is
-    /// unambiguous even if the model reorders or omits entries.
+    /// The model echoes back each reminder's token alongside its score, so
+    /// mapping back to items is unambiguous even if the model reorders or
+    /// omits entries.
     private func thoroughScoreWithModel(_ batch: [ReminderItem]) async -> [String: Int] {
         let lines = batch.enumerated().map { index, item in
             formatLine(token: "R\(index)", item: item)
@@ -172,6 +165,7 @@ struct AIPrioritizer {
             tokenToID["R\(index)"] = item.id
         }
 
+        let now = Date()
         do {
             let prompt = "Score these reminders' urgency from 0-100:\n" + lines.joined(separator: "\n")
             let response = try await session.respond(to: prompt, generating: UrgencyScores.self)
@@ -182,60 +176,14 @@ struct AIPrioritizer {
                     result[id] = min(100, max(0, entry.score))
                 }
             }
-            let now = Date()
             for item in batch where result[item.id] == nil {
-                result[item.id] = Int(HeuristicRanker.score(item, now: now))
-            }
-            return result
-        } catch {
-            let now = Date()
-            var result: [String: Int] = [:]
-            for item in batch {
-                result[item.id] = Int(HeuristicRanker.score(item, now: now))
-            }
-            return result
-        }
-    }
-
-    /// A cheaper, faster scoring call for the very first ranking pass: plain
-    /// integers matched back to items purely by position, no per-item token
-    /// field to generate. Roughly halves the output the model has to
-    /// produce compared to the thorough call above.
-    private func quickScoreWithModel(_ batch: [ReminderItem]) async -> [String: Int] {
-        let lines = batch.enumerated().map { index, item in
-            formatLine(token: "R\(index)", item: item)
-        }
-
-        let session = LanguageModelSession(
-            instructions: """
-            You rate a person's reminders (to-dos) on an urgency/importance scale \
-            from 0 to 100, where 100 is extremely urgent or important and 0 is not \
-            urgent at all. Weigh due date, priority, and list. Respond only with \
-            the requested scores, in the same order the reminders were listed.
-            """
-        )
-
-        let now = Date()
-        do {
-            let prompt = "Score these reminders' urgency from 0-100, one score per reminder in listed order:\n"
-                + lines.joined(separator: "\n")
-            let response = try await session.respond(to: prompt, generating: QuickScores.self)
-
-            guard response.content.scores.count == batch.count else {
-                var result: [String: Int] = [:]
-                for item in batch { result[item.id] = Int(HeuristicRanker.score(item, now: now)) }
-                return result
-            }
-
-            var result: [String: Int] = [:]
-            for (index, item) in batch.enumerated() {
-                result[item.id] = min(100, max(0, response.content.scores[index]))
+                result[item.id] = clampedScore(HeuristicRanker.score(item, now: now))
             }
             return result
         } catch {
             var result: [String: Int] = [:]
             for item in batch {
-                result[item.id] = Int(HeuristicRanker.score(item, now: now))
+                result[item.id] = clampedScore(HeuristicRanker.score(item, now: now))
             }
             return result
         }

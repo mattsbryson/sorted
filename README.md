@@ -79,24 +79,26 @@ model call fails, ranking falls back to a deterministic heuristic score
 the app still works, it just won't be AI-scored, and a small note explains
 why on the Home screen when AI is unavailable entirely.
 
-**Two-pass scoring.** There are two request shapes:
+**Placeholder-then-refine scoring.** New or changed reminders (including on
+the very first pass ever, with an empty cache) get an instant heuristic
+placeholder score so nothing ever blocks the UI. The real `UrgencyScores`
+call — the model echoing back each reminder's token alongside its score, so
+mapping the response back to items is unambiguous — then runs as a
+background task and silently updates the UI (via an `onImproved` callback)
+once it finishes.
 
-- `UrgencyScores` — the model echoes back each reminder's token alongside its
-  score, so mapping the response back to items is unambiguous. This is the
-  "real" pass, used everywhere except the one case below.
-- `QuickScores` — plain integers with no token field, matched back to items
-  purely by position. Cheaper to generate (roughly half the output of
-  `UrgencyScores`) but less safe if the model ever miscounts.
-
-On the very first scoring pass this app has ever done (empty cache — a fresh
-install, or before anything's been scored yet), everything is scored with the
-cheap `QuickScores` pass first so something reasonable appears immediately,
-then silently re-scored with the full `UrgencyScores` pass as a background
-task that updates the UI when it finishes. Every later pass skips `QuickScores`
-entirely: only new/changed reminders need scoring at all (see the cache below),
-so they get an instant heuristic placeholder instead while the real
-`UrgencyScores` call runs in the background — nothing ever blocks the UI
-after that first pass.
+An earlier version tried a cheaper `QuickScores` pass first (plain integers,
+no per-item token, matched back to items purely by position) to get an
+AI-scored placeholder faster than the full pass. In practice the model
+doesn't reliably return the right *count* of scores without a token
+anchoring each value to a specific reminder — one test batch of 40 items
+came back with 50 scores, all identical. That silently fell back to the
+heuristic anyway (the safety net worked), but paid for a wasted model call
+to get there. `QuickScores` was removed; the heuristic placeholder is used
+directly instead, which is both faster and more honest about what's
+actually happening. Heuristic-derived scores are clamped to the same 0-100
+range as AI scores so a placeholder can never outrank a legitimately-scored
+item by virtue of being unbounded.
 
 ### Ranking cache
 
@@ -123,14 +125,15 @@ scoring pass.
 
 ### Loading screen
 
-The full-screen progress bar ("Reminders are being processed and sorted…") is
-reserved for that one first-ever scoring pass described above — it's the only
-time the app has nothing to show yet. Every later launch or refresh goes
-straight to the tabs with whatever's available (cached scores, or an instant
-heuristic placeholder for anything new) while the real score for new/changed
-reminders arrives quietly in the background; there's no blocking screen for
-it. Progress during the first pass is a real (if approximate) estimate of
-completed vs. expected model calls.
+Since scoring now always returns an instant placeholder (heuristic-derived,
+or cached) rather than blocking on the model, the app never actually needs
+the full-screen progress bar ("Reminders are being processed and sorted…")
+in normal operation — every launch or refresh goes straight to the tabs, and
+real AI scores for new/changed reminders arrive quietly in the background.
+The progress-bar loading state (`LoadState.loading`, gated by
+`AIPrioritizer.isFirstPass()`) is kept as a defensive fallback for any future
+case that does need to block synchronously, but you shouldn't expect to see
+it under normal use.
 
 ### Swipe-to-skip (Today tab)
 
