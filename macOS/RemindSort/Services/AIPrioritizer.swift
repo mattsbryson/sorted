@@ -8,7 +8,7 @@ enum AIAvailability: Sendable {
 
 struct AIPrioritizer {
     /// The model's context window limits how many reminders can be judged in
-    /// a single call, so ranking is split into batches of at most this size.
+    /// a single call, so scoring is split into batches of at most this size.
     private static let batchSize = 40
 
     static var availability: AIAvailability {
@@ -26,24 +26,23 @@ struct AIPrioritizer {
         }
     }
 
-    /// Returns all items ranked from most to least important, using the on-device
-    /// model where possible and falling back to heuristics otherwise.
+    /// Returns all items ranked from most to least important, using an
+    /// independent 0-100 urgency score per reminder from the on-device model
+    /// where possible, falling back to a heuristic score otherwise.
     ///
-    /// Only reminders that are new or have actually changed since the last
-    /// ranking pass are sent to the model — everything unchanged keeps its
-    /// previously established position for free. New/changed items are
-    /// ranked among themselves, then merged into the existing order.
+    /// Only reminders whose content hash isn't already cached get a fresh
+    /// score; everything else reuses its previous score for free. Because
+    /// scores are absolute (not relative to a batch), combining cached and
+    /// freshly-scored items is just a plain sort — no merging required.
     ///
     /// `onProgress` (if given) is called on the main actor with a 0...1
     /// fraction as batches complete; it's an estimate, capped below 1 until
-    /// ranking actually finishes.
+    /// scoring actually finishes.
     func rank(_ items: [ReminderItem], onProgress: (@MainActor (Double) -> Void)? = nil) async -> [ReminderItem] {
         guard !items.isEmpty else {
             await onProgress?(1)
             return []
         }
-
-        let diff = RankingCache.diff(against: items)
 
         guard case .available = Self.availability else {
             let sorted = HeuristicRanker.sort(items)
@@ -51,131 +50,91 @@ struct AIPrioritizer {
             return sorted
         }
 
-        guard !diff.toRank.isEmpty else {
-            // Nothing new or changed — reuse the cached order entirely, no model call.
-            await onProgress?(1)
-            return diff.unchanged
+        var scores = ScoreCache.cachedScores(for: items)
+        let toScore = items.filter { scores[$0.id] == nil }
+
+        if !toScore.isEmpty {
+            let totalBatches = max(1, Int((Double(toScore.count) / Double(Self.batchSize)).rounded(.up)))
+            let tracker = ProgressTracker(estimatedCalls: totalBatches, onProgress: onProgress)
+            let preSorted = HeuristicRanker.sort(toScore)
+
+            for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
+                let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
+                let batchScores = await scoreWithModel(chunk)
+                for (id, score) in batchScores {
+                    scores[id] = score
+                }
+                await tracker.advance()
+            }
         }
 
-        let tracker = ProgressTracker(estimatedCalls: estimatedCallCount(for: diff), onProgress: onProgress)
-
-        let rankedNew = await rankGroup(diff.toRank, tracker: tracker)
-        let result: [ReminderItem]
-        if diff.unchanged.isEmpty {
-            result = rankedNew
-        } else {
-            result = await mergeRuns([diff.unchanged, rankedNew], tracker: tracker)
-        }
-
-        RankingCache.save(rankedItems: result)
+        ScoreCache.save(items: items, scores: scores)
         await onProgress?(1)
-        return result
+
+        let now = Date()
+        let heuristicOrder = HeuristicRanker.sort(items)
+        let heuristicIndex = Dictionary(uniqueKeysWithValues: heuristicOrder.enumerated().map { ($1.id, $0) })
+
+        return items.sorted { a, b in
+            let scoreA = scores[a.id] ?? Int(HeuristicRanker.score(a, now: now))
+            let scoreB = scores[b.id] ?? Int(HeuristicRanker.score(b, now: now))
+            if scoreA != scoreB { return scoreA > scoreB }
+            // Stable tie-break so equal scores don't jump around between runs.
+            return (heuristicIndex[a.id] ?? .max) < (heuristicIndex[b.id] ?? .max)
+        }
     }
 
-    private func estimatedCallCount(for diff: RankingCache.Diff) -> Int {
-        let toRankBatches = max(1, Int((Double(diff.toRank.count) / Double(Self.batchSize)).rounded(.up)))
-        let mergeEstimate = diff.unchanged.isEmpty ? 0 : max(1, toRankBatches)
-        return max(1, toRankBatches * 2 + mergeEstimate)
-    }
-
-    /// Ranks a single group of reminders in full: splits into <=batchSize
-    /// chunks, ranks each independently, then merges the ranked chunks.
-    private func rankGroup(_ items: [ReminderItem], tracker: ProgressTracker) async -> [ReminderItem] {
-        let preSorted = HeuristicRanker.sort(items)
-
-        guard preSorted.count > 1 else {
-            // A single item has nothing to compare against — no call needed.
-            return preSorted
-        }
-
-        guard preSorted.count > Self.batchSize else {
-            let result = (try? await rankWithModel(preSorted)) ?? preSorted
-            await tracker.advance()
-            return result
-        }
-
-        var runs: [[ReminderItem]] = []
-        for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
-            let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
-            let ranked = (try? await rankWithModel(chunk)) ?? chunk
-            await tracker.advance()
-            runs.append(ranked)
-        }
-
-        return await mergeRuns(runs, tracker: tracker)
-    }
-
-    /// A k-way "merge sort" merge, generalized from pairwise comparison to
-    /// batch comparison: each round takes the top N items off every remaining
-    /// run (N chosen so the combined pool stays within batchSize), asks the
-    /// model to rank that pool together, locks the result into the final
-    /// order, and continues with the shortened runs until everything merges.
-    private func mergeRuns(_ initialRuns: [[ReminderItem]], tracker: ProgressTracker) async -> [ReminderItem] {
-        var runs = initialRuns.filter { !$0.isEmpty }
-        var result: [ReminderItem] = []
-
-        while runs.count > 1 {
-            let perRun = max(1, Self.batchSize / runs.count)
-            var pool: [ReminderItem] = []
-            var taken: [Int] = []
-            for run in runs {
-                let take = min(perRun, run.count)
-                pool.append(contentsOf: run.prefix(take))
-                taken.append(take)
-            }
-
-            let ranked = (try? await rankWithModel(pool)) ?? pool
-            await tracker.advance()
-            result.append(contentsOf: ranked)
-
-            runs = zip(runs, taken).compactMap { run, take in
-                let remaining = Array(run.dropFirst(take))
-                return remaining.isEmpty ? nil : remaining
-            }
-        }
-
-        if let last = runs.first {
-            result.append(contentsOf: last)
-        }
-
-        return result
-    }
-
-    private func rankWithModel(_ batch: [ReminderItem]) async throws -> [ReminderItem] {
+    /// Scores one batch (<=batchSize) of reminders via the model. Never
+    /// throws to the caller — falls back to a heuristic-derived score per
+    /// item on any failure, or for anything the model's response omits.
+    private func scoreWithModel(_ batch: [ReminderItem]) async -> [String: Int] {
         let lines = batch.enumerated().map { index, item in
             formatLine(token: "R\(index)", item: item)
         }
 
         let session = LanguageModelSession(
             instructions: """
-            You rank a person's reminders (to-dos) by true importance and urgency. \
-            Weigh due date (overdue and soon-due items are usually more urgent), \
-            its explicit priority level if set, and which list/project it belongs to. \
-            Use the title and notes to judge real-world stakes and urgency too. \
-            Respond only with the requested ranking, nothing else.
+            You rate a person's reminders (to-dos) on an urgency/importance scale \
+            from 0 to 100, where 100 is extremely urgent or important and 0 is not \
+            urgent at all. Weigh due date (overdue and soon-due items are usually \
+            more urgent), the reminder's explicit priority level if set, and which \
+            list/project it belongs to. Use the title and notes to judge real-world \
+            stakes and urgency too. Give each reminder its own independent score \
+            reflecting its true urgency, not just a relative rank — multiple \
+            reminders can and should share similar scores if they're similarly \
+            urgent. Respond only with the requested scores.
             """
         )
 
-        let prompt = "Rank these reminders from most to least important:\n" + lines.joined(separator: "\n")
-        let response = try await session.respond(to: prompt, generating: PriorityRanking.self)
-
-        var tokenToItem: [String: ReminderItem] = [:]
+        var tokenToID: [String: String] = [:]
         for (index, item) in batch.enumerated() {
-            tokenToItem["R\(index)"] = item
+            tokenToID["R\(index)"] = item.id
         }
 
-        var seen = Set<String>()
-        var ranked: [ReminderItem] = []
-        for token in response.content.orderedTokens {
-            if let item = tokenToItem[token], seen.insert(token).inserted {
-                ranked.append(item)
+        do {
+            let prompt = "Score these reminders' urgency from 0-100:\n" + lines.joined(separator: "\n")
+            let response = try await session.respond(to: prompt, generating: UrgencyScores.self)
+
+            var result: [String: Int] = [:]
+            for entry in response.content.scores {
+                if let id = tokenToID[entry.token] {
+                    result[id] = min(100, max(0, entry.score))
+                }
             }
+            // Fall back to a heuristic score for anything the model omitted.
+            let now = Date()
+            for item in batch where result[item.id] == nil {
+                result[item.id] = Int(HeuristicRanker.score(item, now: now))
+            }
+            return result
+        } catch {
+            let now = Date()
+            var result: [String: Int] = [:]
+            for item in batch {
+                result[item.id] = Int(HeuristicRanker.score(item, now: now))
+            }
+            return result
         }
-        // Append anything the model omitted, preserving heuristic order.
-        for (index, item) in batch.enumerated() where !seen.contains("R\(index)") {
-            ranked.append(item)
-        }
-        return ranked
     }
 
     private func formatLine(token: String, item: ReminderItem) -> String {
@@ -205,9 +164,9 @@ struct AIPrioritizer {
     }()
 }
 
-/// Tracks completed-vs-estimated model calls for one ranking pass and reports
+/// Tracks completed-vs-estimated model calls for one scoring pass and reports
 /// an approximate 0...1 fraction, capped below 1 until the caller marks
-/// completion explicitly (estimates can under/overshoot the real call count).
+/// completion explicitly.
 private final class ProgressTracker {
     private let total: Int
     private var completed = 0

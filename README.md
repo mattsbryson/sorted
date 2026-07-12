@@ -56,7 +56,9 @@ always agree on relative importance.
 
 Ranking is done by Apple's **Foundation Models** framework
 (`SystemLanguageModel` / `LanguageModelSession`), the on-device LLM behind
-Apple Intelligence — no network calls, nothing leaves the device. For each
+Apple Intelligence — no network calls, nothing leaves the device. Each
+reminder gets an **independent urgency score from 0-100** (`AIPrioritizer.swift`,
+`Models/UrgencyScores.swift`), not a relative rank within a batch. For each
 reminder, the model is given:
 
 - Title and notes
@@ -64,49 +66,41 @@ reminder, the model is given:
 - The reminder's explicit priority field (High / Medium / Low / None)
 - Which Reminders list it belongs to
 
-It returns a full most-to-least-important ordering, which drives Home and all
-three list tabs.
+The model's context window can't hold an unlimited number of reminders in one
+call, so scoring is split into chunks of at most 40. Because scores are
+absolute rather than relative to a batch, combining chunks afterward is just
+a plain sort by score — no merging separately-ranked batches together, which
+was both slower and a source of bugs in an earlier ordinal-ranking design.
 
 If Apple Intelligence isn't available (unsupported hardware, not enabled in
-System Settings, or the on-device model is still downloading), ranking falls
-back to a deterministic heuristic (overdue → flagged priority level → due
-date proximity) — the app still works, it just won't be AI-ranked, and a
-small note explains why on the Home screen.
-
-The model's context window can't hold an unlimited number of reminders in one
-call, so **all** reminders now still get AI-ranked, just in batches (`AIPrioritizer.swift`):
-
-1. All reminders are split into chunks of at most 40.
-2. Each chunk is ranked by the model independently.
-3. The ranked chunks are merged — like the merge step of merge sort, but
-   batched instead of pairwise: each round pulls the top items off every
-   remaining chunk (as many as fit back within 40 combined), asks the model
-   to rank that pooled batch together, and locks that order into the final
-   result. This repeats, with chunks shrinking each round, until everything's
-   merged into one final order.
-
-For N reminders this costs roughly `2 * ceil(N/40)` model calls total — bounded
-and linear, not one call per reminder.
+System Settings, or the on-device model is still downloading), or a given
+model call fails, ranking falls back to a deterministic heuristic score
+(priority level + overdue/due-soon proximity) for the affected reminders —
+the app still works, it just won't be AI-scored, and a small note explains
+why on the Home screen when AI is unavailable entirely.
 
 ### Ranking cache
 
-Running the on-device model takes several seconds, so previous results are
-cached **per reminder**, not as one all-or-nothing snapshot
-(`RankingCache.swift`, persisted via `UserDefaults`). Each reminder's
-content hash (title, notes, due date, priority, list) is stored alongside
-its position in the last ranked order. On the next launch or manual refresh:
+Running the on-device model takes several seconds, so each reminder's score
+is cached **individually**, keyed by a content hash of that reminder alone
+(`ScoreCache.swift`, persisted via `UserDefaults`) — title, notes, due date,
+priority, and list. On the next launch or manual refresh:
 
-- Reminders whose hash is unchanged keep their previous position for free —
-  no model call at all.
-- Only reminders that are new, or whose hash changed (edited title/notes/due
-  date/priority/list), get ranked. If none did, refresh is instant with zero
-  model calls.
-- Those new/changed reminders are ranked among themselves, then merged into
-  the existing cached order using the same batched merge-sort-style process
-  described above, so only the delta ever costs a model call — not the whole
-  list.
-- Reminders no longer present (completed/deleted elsewhere) are simply
-  dropped from the cached order.
+- Reminders whose hash matches a cached entry reuse that score instantly —
+  no model call.
+- Only reminders that are new or have a changed hash (edited title/notes/due
+  date/priority/list) get sent to the model. If none did, refresh is
+  effectively instant with zero model calls.
+- The cache is rewritten from scratch each save, scoped to exactly the
+  current reminder set, so entries for completed/deleted/edited-away
+  reminders never pile up.
+
+This is deliberately simpler than reconstructing or merging a previous
+ordering: there's no ordering to reconstruct at all, just a hash lookup per
+reminder and a plain sort by score at the end — verified on-device (iOS
+Simulator) across repeated launches with unchanged data: zero model-generation
+activity in the logs on the second and third launch after the first full
+scoring pass.
 
 ### Loading screen
 

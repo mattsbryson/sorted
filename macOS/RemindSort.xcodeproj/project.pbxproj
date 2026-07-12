@@ -13,25 +13,25 @@
 		608DE8FE16FDC4F45128185B /* HeuristicRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */; };
 		60D90A54DC63102D7DA97578 /* AIPrioritizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */; };
 		77060C38CC17A7A6EA6BB915 /* ReminderListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81593C39044699CD2DE543DC /* ReminderListView.swift */; };
+		7CD287C4838EE6E707A0D4B5 /* ScoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62ABB71E9CEDDBCBD48D4D5D /* ScoreCache.swift */; };
 		7F45CBEC2A8899CB313E3F34 /* ReminderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D379CACE9591272583679822 /* ReminderRow.swift */; };
 		8592B4672B7F0EA9DD989F49 /* SnoozeUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A47729FDED1EB0650BAF7375 /* SnoozeUnit.swift */; };
 		A19D2430766821FB8F8FBE7B /* RemindersService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 511D33AAA6F009CDCD05DE8F /* RemindersService.swift */; };
 		A6D4B62DAE80FF7A0D815098 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D34B3E7DCE3320A85AFFACC9 /* Assets.xcassets */; };
+		B56AFA907A8EC6706F3ADF3C /* UrgencyScores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7844C8790BC2D038FCA6B4 /* UrgencyScores.swift */; };
 		B6CEBB1E11E64A597CB4146F /* RemindersViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9FEBA39830261C3F4FF5A5 /* RemindersViewModel.swift */; };
-		B9237C22FFF221F112D19E85 /* PriorityRanking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628484800D636531B99C0DC6 /* PriorityRanking.swift */; };
-		CD0C3919FEDE6496EE811D17 /* RankingCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D515BCCA8A8557B377EAC57 /* RankingCache.swift */; };
 		E683580AD8B500BA4962C1A6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 225BCCE2814045CDF478F095 /* ContentView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0A7844C8790BC2D038FCA6B4 /* UrgencyScores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrgencyScores.swift; sourceTree = "<group>"; };
 		225BCCE2814045CDF478F095 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPrioritizer.swift; sourceTree = "<group>"; };
 		2BF2C2A453EE4B7DF65B8EDF /* RemindSortApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindSortApp.swift; sourceTree = "<group>"; };
 		45E949FF6FFE07CFA88A5BD2 /* ReminderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderItem.swift; sourceTree = "<group>"; };
 		511D33AAA6F009CDCD05DE8F /* RemindersService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersService.swift; sourceTree = "<group>"; };
-		5D515BCCA8A8557B377EAC57 /* RankingCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingCache.swift; sourceTree = "<group>"; };
 		5F9FEBA39830261C3F4FF5A5 /* RemindersViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersViewModel.swift; sourceTree = "<group>"; };
-		628484800D636531B99C0DC6 /* PriorityRanking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriorityRanking.swift; sourceTree = "<group>"; };
+		62ABB71E9CEDDBCBD48D4D5D /* ScoreCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreCache.swift; sourceTree = "<group>"; };
 		755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeuristicRanker.swift; sourceTree = "<group>"; };
 		81593C39044699CD2DE543DC /* ReminderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderListView.swift; sourceTree = "<group>"; };
 		8CE3597385661620001A2876 /* RemindSort.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RemindSort.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -79,8 +79,8 @@
 			children = (
 				2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */,
 				755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */,
-				5D515BCCA8A8557B377EAC57 /* RankingCache.swift */,
 				511D33AAA6F009CDCD05DE8F /* RemindersService.swift */,
+				62ABB71E9CEDDBCBD48D4D5D /* ScoreCache.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -88,9 +88,9 @@
 		7B758DB30EB371652F8ED9BD /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				628484800D636531B99C0DC6 /* PriorityRanking.swift */,
 				45E949FF6FFE07CFA88A5BD2 /* ReminderItem.swift */,
 				A47729FDED1EB0650BAF7375 /* SnoozeUnit.swift */,
+				0A7844C8790BC2D038FCA6B4 /* UrgencyScores.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -193,15 +193,15 @@
 				E683580AD8B500BA4962C1A6 /* ContentView.swift in Sources */,
 				608DE8FE16FDC4F45128185B /* HeuristicRanker.swift in Sources */,
 				2349E4863388B5B5018F4E1E /* HomeView.swift in Sources */,
-				B9237C22FFF221F112D19E85 /* PriorityRanking.swift in Sources */,
-				CD0C3919FEDE6496EE811D17 /* RankingCache.swift in Sources */,
 				343FBFFD3B9F19578711BB26 /* RemindSortApp.swift in Sources */,
 				0A4C3365CDF07446DD8CBC26 /* ReminderItem.swift in Sources */,
 				77060C38CC17A7A6EA6BB915 /* ReminderListView.swift in Sources */,
 				7F45CBEC2A8899CB313E3F34 /* ReminderRow.swift in Sources */,
 				A19D2430766821FB8F8FBE7B /* RemindersService.swift in Sources */,
 				B6CEBB1E11E64A597CB4146F /* RemindersViewModel.swift in Sources */,
+				7CD287C4838EE6E707A0D4B5 /* ScoreCache.swift in Sources */,
 				8592B4672B7F0EA9DD989F49 /* SnoozeUnit.swift in Sources */,
+				B56AFA907A8EC6706F3ADF3C /* UrgencyScores.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
