@@ -5,7 +5,8 @@ struct ReminderListView: View {
 
     let title: String
     let items: [ReminderItem]
-    /// When set, rows can be swiped from the leading edge to skip them
+    /// When set, rows can be swiped from the trailing edge (swipe left, same
+    /// direction as Mail/Reminders' own swipe actions) to skip them
     /// (session-only — doesn't touch Reminders — and lets the next-ranked
     /// item take their place). Used for the Today tab.
     var onSkip: ((ReminderItem) -> Void)? = nil
@@ -27,7 +28,7 @@ struct ReminderListView: View {
                             } onDelete: {
                                 Task { await viewModel.delete(item) }
                             }
-                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 if let onSkip {
                                     Button {
                                         onSkip(item)
