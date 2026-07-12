@@ -99,6 +99,32 @@ final class RemindersViewModel {
         }
     }
 
+    /// Pushes the reminder's due date to (now + amount of unit). Patches the
+    /// item in place rather than re-fetching/re-ranking, so it's instant; the
+    /// next real refresh will naturally re-rank since the due date changed.
+    func snooze(_ item: ReminderItem, amount: Int, unit: SnoozeUnit) async {
+        guard let newDate = Calendar.current.date(byAdding: unit.dateComponents(amount), to: Date()) else { return }
+        do {
+            try remindersService.setDueDate(item.id, to: newDate)
+            if let index = rankedReminders.firstIndex(where: { $0.id == item.id }) {
+                rankedReminders[index] = ReminderItem(
+                    id: item.id,
+                    title: item.title,
+                    notes: item.notes,
+                    dueDate: newDate,
+                    rawPriority: item.rawPriority,
+                    listName: item.listName,
+                    creationDate: item.creationDate
+                )
+            }
+            if homeIndex >= rankedReminders.count {
+                homeIndex = 0
+            }
+        } catch {
+            loadState = .error(error.localizedDescription)
+        }
+    }
+
     private func removeLocally(_ item: ReminderItem) {
         rankedReminders.removeAll { $0.id == item.id }
         if homeIndex >= rankedReminders.count {

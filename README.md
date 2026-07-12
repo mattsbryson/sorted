@@ -30,6 +30,12 @@ cd macOS && xcodegen generate   # or: cd iOS && xcodegen generate
 
 - **Home** — shows a single card for the most important reminder overall,
   determined by AI ranking (see below).
+  - **Snooze** opens a picker (spinning wheel on iOS; stepper + segmented
+    control on macOS, since SwiftUI's wheel picker style is iOS-only) to pick
+    an amount and a unit (Day/Month/Year), then pushes the reminder's due
+    date to *now + that amount* in Reminders. Updates instantly in the UI
+    without a full re-rank; the next real refresh re-ranks normally since the
+    due date change invalidates the ranking cache.
   - **Complete** marks it done in Reminders and advances to the next one.
   - **Skip** cycles to the next-most-important reminder without changing
     anything in Reminders (wraps back to the top after the last one).

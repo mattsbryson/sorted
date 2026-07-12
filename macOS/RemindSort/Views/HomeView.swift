@@ -3,6 +3,9 @@ import SwiftUI
 struct HomeView: View {
     @Environment(RemindersViewModel.self) private var viewModel
     @State private var showingDeleteConfirmation = false
+    @State private var showingSnoozePopover = false
+    @State private var snoozeAmount = 1
+    @State private var snoozeUnit: SnoozeUnit = .day
 
     var body: some View {
         VStack(spacing: 24) {
@@ -24,6 +27,19 @@ struct HomeView: View {
                     ReminderCard(reminder: reminder)
 
                     HStack(spacing: 16) {
+                        Button {
+                            showingSnoozePopover = true
+                        } label: {
+                            Label("Snooze", systemImage: "zzz")
+                        }
+                        .buttonStyle(.bordered)
+                        .popover(isPresented: $showingSnoozePopover) {
+                            SnoozePopover(amount: $snoozeAmount, unit: $snoozeUnit) {
+                                Task { await viewModel.snooze(reminder, amount: snoozeAmount, unit: snoozeUnit) }
+                                showingSnoozePopover = false
+                            }
+                        }
+
                         Button {
                             Task { await viewModel.complete(reminder) }
                         } label: {
@@ -79,6 +95,38 @@ struct HomeView: View {
             .padding(.bottom, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// macOS has no wheel-style picker (SwiftUI's .wheel picker style is
+// unavailable on macOS), so amount/unit selection uses a stepper + segmented
+// picker instead as the platform-native equivalent.
+private struct SnoozePopover: View {
+    @Binding var amount: Int
+    @Binding var unit: SnoozeUnit
+    var onConfirm: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Snooze")
+                .font(.headline)
+
+            Stepper("\(amount) \(unit.pluralized(for: amount))", value: $amount, in: 1...30)
+
+            Picker("Unit", selection: $unit) {
+                ForEach(SnoozeUnit.allCases) { unit in
+                    Text(unit.pluralized(for: amount)).tag(unit)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            Button("Snooze", action: onConfirm)
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+        }
+        .padding()
+        .frame(width: 260)
     }
 }
 

@@ -62,4 +62,13 @@ final class RemindersService {
         guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return }
         try store.remove(reminder, commit: true)
     }
+
+    func setDueDate(_ id: String, to date: Date) throws {
+        guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return }
+        reminder.dueDateComponents = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second],
+            from: date
+        )
+        try store.save(reminder, commit: true)
+    }
 }

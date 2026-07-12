@@ -3,6 +3,9 @@ import SwiftUI
 struct HomeView: View {
     @Environment(RemindersViewModel.self) private var viewModel
     @State private var showingDeleteConfirmation = false
+    @State private var showingSnoozeSheet = false
+    @State private var snoozeAmount = 1
+    @State private var snoozeUnit: SnoozeUnit = .day
 
     var body: some View {
         VStack(spacing: 24) {
@@ -24,13 +27,23 @@ struct HomeView: View {
                     ReminderCard(reminder: reminder)
 
                     VStack(spacing: 12) {
-                        Button {
-                            Task { await viewModel.complete(reminder) }
-                        } label: {
-                            Label("Complete", systemImage: "checkmark.circle.fill")
-                                .frame(maxWidth: .infinity)
+                        HStack(spacing: 12) {
+                            Button {
+                                showingSnoozeSheet = true
+                            } label: {
+                                Label("Snooze", systemImage: "zzz")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button {
+                                Task { await viewModel.complete(reminder) }
+                            } label: {
+                                Label("Complete", systemImage: "checkmark.circle.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
-                        .buttonStyle(.borderedProminent)
                         .controlSize(.large)
 
                         HStack(spacing: 12) {
@@ -65,6 +78,11 @@ struct HomeView: View {
                     }
                     Button("Cancel", role: .cancel) {}
                 }
+                .sheet(isPresented: $showingSnoozeSheet) {
+                    SnoozeSheet(amount: $snoozeAmount, unit: $snoozeUnit) {
+                        Task { await viewModel.snooze(reminder, amount: snoozeAmount, unit: snoozeUnit) }
+                    }
+                }
             } else {
                 ContentUnavailableView(
                     "All Clear",
@@ -85,6 +103,48 @@ struct HomeView: View {
             .padding(.bottom, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct SnoozeSheet: View {
+    @Binding var amount: Int
+    @Binding var unit: SnoozeUnit
+    var onConfirm: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            HStack(spacing: 0) {
+                Picker("Amount", selection: $amount) {
+                    ForEach(1...30, id: \.self) { n in
+                        Text("\(n)").tag(n)
+                    }
+                }
+                .pickerStyle(.wheel)
+
+                Picker("Unit", selection: $unit) {
+                    ForEach(SnoozeUnit.allCases) { unit in
+                        Text(unit.pluralized(for: amount)).tag(unit)
+                    }
+                }
+                .pickerStyle(.wheel)
+            }
+            .labelsHidden()
+            .navigationTitle("Snooze")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Snooze") {
+                        onConfirm()
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.height(260)])
     }
 }
 
