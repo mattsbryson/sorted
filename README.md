@@ -66,9 +66,19 @@ back to a deterministic heuristic (overdue → flagged priority level → due
 date proximity) — the app still works, it just won't be AI-ranked, and a
 small note explains why on the Home screen.
 
-To keep prompts inside the on-device model's context window, only the top 40
-heuristically pre-sorted reminders are sent to the model per ranking pass;
-anything beyond that keeps its heuristic order.
+To keep prompts inside the on-device model's context window, only the **40
+most recently created** reminders are sent to the model per ranking pass;
+anything older keeps its heuristic order instead.
+
+### Ranking cache
+
+Running the on-device model takes several seconds, so its result is cached
+(`RankingCache.swift`, persisted via `UserDefaults`) against a content hash
+of every reminder's title, notes, due date, priority, and list. On the next
+launch or manual refresh, if that hash is unchanged the cached order is
+reused instantly and the model isn't invoked at all. Any actual change —
+a new reminder, an edited title/notes/due date/priority, or moving lists —
+invalidates the cache and triggers a fresh ranking pass.
 
 ### Swipe-to-skip (Today tab)
 

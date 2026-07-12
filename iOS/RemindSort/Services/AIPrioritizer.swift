@@ -27,20 +27,41 @@ struct AIPrioritizer {
     }
 
     /// Returns all items ranked from most to least important, using the on-device
-    /// model where possible and falling back to heuristics otherwise.
+    /// model where possible and falling back to heuristics otherwise. Skips the
+    /// (slow) model call entirely if nothing has changed since the last ranking.
     func rank(_ items: [ReminderItem]) async -> [ReminderItem] {
-        let preSorted = HeuristicRanker.sort(items)
-        guard case .available = Self.availability else { return preSorted }
+        let fingerprint = RankingCache.fingerprint(for: items)
+        if let cachedOrder = RankingCache.loadOrder(matching: fingerprint) {
+            let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+            let cached = cachedOrder.compactMap { byID[$0] }
+            if cached.count == items.count {
+                return cached
+            }
+        }
 
-        let batch = Array(preSorted.prefix(Self.maxRankedByModel))
-        let remainder = Array(preSorted.dropFirst(Self.maxRankedByModel))
-        guard !batch.isEmpty else { return remainder }
+        guard case .available = Self.availability else {
+            return HeuristicRanker.sort(items)
+        }
+
+        // The model only sees the most recently created reminders, both to stay
+        // inside its context window and to prioritize what's newly on your plate.
+        let byRecency = items.sorted { ($0.creationDate ?? .distantPast) > ($1.creationDate ?? .distantPast) }
+        let batch = Array(byRecency.prefix(Self.maxRankedByModel))
+        let batchIDs = Set(batch.map(\.id))
+        let remainder = HeuristicRanker.sort(items.filter { !batchIDs.contains($0.id) })
+
+        guard !batch.isEmpty else {
+            RankingCache.save(fingerprint: fingerprint, order: remainder.map(\.id))
+            return remainder
+        }
 
         do {
             let ranked = try await rankWithModel(batch)
-            return ranked + remainder
+            let result = ranked + remainder
+            RankingCache.save(fingerprint: fingerprint, order: result.map(\.id))
+            return result
         } catch {
-            return preSorted
+            return HeuristicRanker.sort(items)
         }
     }
 

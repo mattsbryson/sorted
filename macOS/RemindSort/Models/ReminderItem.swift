@@ -21,6 +21,7 @@ struct ReminderItem: Identifiable, Hashable, Sendable {
     let dueDate: Date?
     let rawPriority: Int
     let listName: String
+    let creationDate: Date?
 
     var priorityLevel: ReminderPriorityLevel { ReminderPriorityLevel(rawPriority: rawPriority) }
 

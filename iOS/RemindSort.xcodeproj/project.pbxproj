@@ -18,6 +18,7 @@
 		A6D4B62DAE80FF7A0D815098 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D34B3E7DCE3320A85AFFACC9 /* Assets.xcassets */; };
 		B6CEBB1E11E64A597CB4146F /* RemindersViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9FEBA39830261C3F4FF5A5 /* RemindersViewModel.swift */; };
 		B9237C22FFF221F112D19E85 /* PriorityRanking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628484800D636531B99C0DC6 /* PriorityRanking.swift */; };
+		CD0C3919FEDE6496EE811D17 /* RankingCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D515BCCA8A8557B377EAC57 /* RankingCache.swift */; };
 		E683580AD8B500BA4962C1A6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 225BCCE2814045CDF478F095 /* ContentView.swift */; };
 /* End PBXBuildFile section */
 
@@ -27,11 +28,12 @@
 		2BF2C2A453EE4B7DF65B8EDF /* RemindSortApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindSortApp.swift; sourceTree = "<group>"; };
 		45E949FF6FFE07CFA88A5BD2 /* ReminderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderItem.swift; sourceTree = "<group>"; };
 		511D33AAA6F009CDCD05DE8F /* RemindersService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersService.swift; sourceTree = "<group>"; };
+		5D515BCCA8A8557B377EAC57 /* RankingCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingCache.swift; sourceTree = "<group>"; };
 		5F9FEBA39830261C3F4FF5A5 /* RemindersViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersViewModel.swift; sourceTree = "<group>"; };
 		628484800D636531B99C0DC6 /* PriorityRanking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriorityRanking.swift; sourceTree = "<group>"; };
 		755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeuristicRanker.swift; sourceTree = "<group>"; };
 		81593C39044699CD2DE543DC /* ReminderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderListView.swift; sourceTree = "<group>"; };
-		8CE3597385661620001A2876 /* RemindSort.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RemindSort.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CE3597385661620001A2876 /* RemindSort.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RemindSort.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC2AC825A1025259F56C5FB6 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		D34B3E7DCE3320A85AFFACC9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D379CACE9591272583679822 /* ReminderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderRow.swift; sourceTree = "<group>"; };
@@ -75,6 +77,7 @@
 			children = (
 				2458C7A3215F5268FFD22D18 /* AIPrioritizer.swift */,
 				755141D9FF8DF8A15F217B4B /* HeuristicRanker.swift */,
+				5D515BCCA8A8557B377EAC57 /* RankingCache.swift */,
 				511D33AAA6F009CDCD05DE8F /* RemindersService.swift */,
 			);
 			path = Services;
@@ -188,6 +191,7 @@
 				608DE8FE16FDC4F45128185B /* HeuristicRanker.swift in Sources */,
 				2349E4863388B5B5018F4E1E /* HomeView.swift in Sources */,
 				B9237C22FFF221F112D19E85 /* PriorityRanking.swift in Sources */,
+				CD0C3919FEDE6496EE811D17 /* RankingCache.swift in Sources */,
 				343FBFFD3B9F19578711BB26 /* RemindSortApp.swift in Sources */,
 				0A4C3365CDF07446DD8CBC26 /* ReminderItem.swift in Sources */,
 				77060C38CC17A7A6EA6BB915 /* ReminderListView.swift in Sources */,
@@ -327,7 +331,6 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = A9K8GZ46Y9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;
@@ -352,7 +355,6 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = A9K8GZ46Y9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;
