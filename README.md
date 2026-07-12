@@ -32,7 +32,7 @@ cd macOS && xcodegen generate   # or: cd iOS && xcodegen generate
   determined by AI ranking (see below).
   - **Snooze** opens a picker (spinning wheel on iOS; stepper + segmented
     control on macOS, since SwiftUI's wheel picker style is iOS-only) to pick
-    an amount and a unit (Day/Month/Year), then pushes the reminder's due
+    an amount and a unit (Day/Week/Month), then pushes the reminder's due
     date to *now + that amount* in Reminders. Updates instantly in the UI
     without a full re-rank; the next real refresh re-ranks normally since the
     due date change invalidates the ranking cache.

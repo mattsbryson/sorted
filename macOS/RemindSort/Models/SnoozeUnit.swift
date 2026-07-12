@@ -2,8 +2,8 @@ import Foundation
 
 enum SnoozeUnit: String, CaseIterable, Identifiable, Sendable {
     case day = "Day"
+    case week = "Week"
     case month = "Month"
-    case year = "Year"
 
     var id: String { rawValue }
 
@@ -14,8 +14,8 @@ enum SnoozeUnit: String, CaseIterable, Identifiable, Sendable {
     var dateComponents: (Int) -> DateComponents {
         switch self {
         case .day: return { DateComponents(day: $0) }
+        case .week: return { DateComponents(day: $0 * 7) }
         case .month: return { DateComponents(month: $0) }
-        case .year: return { DateComponents(year: $0) }
         }
     }
 }
