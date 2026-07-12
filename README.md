@@ -66,9 +66,20 @@ back to a deterministic heuristic (overdue → flagged priority level → due
 date proximity) — the app still works, it just won't be AI-ranked, and a
 small note explains why on the Home screen.
 
-To keep prompts inside the on-device model's context window, only the **40
-most recently created** reminders are sent to the model per ranking pass;
-anything older keeps its heuristic order instead.
+The model's context window can't hold an unlimited number of reminders in one
+call, so **all** reminders now still get AI-ranked, just in batches (`AIPrioritizer.swift`):
+
+1. All reminders are split into chunks of at most 40.
+2. Each chunk is ranked by the model independently.
+3. The ranked chunks are merged — like the merge step of merge sort, but
+   batched instead of pairwise: each round pulls the top items off every
+   remaining chunk (as many as fit back within 40 combined), asks the model
+   to rank that pooled batch together, and locks that order into the final
+   result. This repeats, with chunks shrinking each round, until everything's
+   merged into one final order.
+
+For N reminders this costs roughly `2 * ceil(N/40)` model calls total — bounded
+and linear, not one call per reminder.
 
 ### Ranking cache
 

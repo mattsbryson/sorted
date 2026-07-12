@@ -7,9 +7,9 @@ enum AIAvailability: Sendable {
 }
 
 struct AIPrioritizer {
-    /// Reminders beyond this count fall back to heuristic ordering, both to keep
-    /// prompts inside the on-device model's context window and keep ranking fast.
-    private static let maxRankedByModel = 40
+    /// The model's context window limits how many reminders can be judged in
+    /// a single call, so ranking is split into batches of at most this size.
+    private static let batchSize = 40
 
     static var availability: AIAvailability {
         switch SystemLanguageModel.default.availability {
@@ -30,6 +30,8 @@ struct AIPrioritizer {
     /// model where possible and falling back to heuristics otherwise. Skips the
     /// (slow) model call entirely if nothing has changed since the last ranking.
     func rank(_ items: [ReminderItem]) async -> [ReminderItem] {
+        guard !items.isEmpty else { return [] }
+
         let fingerprint = RankingCache.fingerprint(for: items)
         if let cachedOrder = RankingCache.loadOrder(matching: fingerprint) {
             let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
@@ -43,26 +45,63 @@ struct AIPrioritizer {
             return HeuristicRanker.sort(items)
         }
 
-        // The model only sees the most recently created reminders, both to stay
-        // inside its context window and to prioritize what's newly on your plate.
-        let byRecency = items.sorted { ($0.creationDate ?? .distantPast) > ($1.creationDate ?? .distantPast) }
-        let batch = Array(byRecency.prefix(Self.maxRankedByModel))
-        let batchIDs = Set(batch.map(\.id))
-        let remainder = HeuristicRanker.sort(items.filter { !batchIDs.contains($0.id) })
+        let result = await rankAll(items)
+        RankingCache.save(fingerprint: fingerprint, order: result.map(\.id))
+        return result
+    }
 
-        guard !batch.isEmpty else {
-            RankingCache.save(fingerprint: fingerprint, order: remainder.map(\.id))
-            return remainder
+    /// Splits the full set into <=batchSize chunks, ranks each chunk
+    /// independently, then merges the ranked chunks together.
+    private func rankAll(_ items: [ReminderItem]) async -> [ReminderItem] {
+        let preSorted = HeuristicRanker.sort(items)
+
+        guard preSorted.count > Self.batchSize else {
+            return (try? await rankWithModel(preSorted)) ?? preSorted
         }
 
-        do {
-            let ranked = try await rankWithModel(batch)
-            let result = ranked + remainder
-            RankingCache.save(fingerprint: fingerprint, order: result.map(\.id))
-            return result
-        } catch {
-            return HeuristicRanker.sort(items)
+        var runs: [[ReminderItem]] = []
+        for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
+            let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
+            let ranked = (try? await rankWithModel(chunk)) ?? chunk
+            runs.append(ranked)
         }
+
+        return await mergeRuns(runs)
+    }
+
+    /// A k-way "merge sort" merge, generalized from pairwise comparison to
+    /// batch comparison: each round takes the top N items off every remaining
+    /// run (N chosen so the combined pool stays within batchSize), asks the
+    /// model to rank that pool together, locks the result into the final
+    /// order, and continues with the shortened runs until everything merges.
+    private func mergeRuns(_ initialRuns: [[ReminderItem]]) async -> [ReminderItem] {
+        var runs = initialRuns.filter { !$0.isEmpty }
+        var result: [ReminderItem] = []
+
+        while runs.count > 1 {
+            let perRun = max(1, Self.batchSize / runs.count)
+            var pool: [ReminderItem] = []
+            var taken: [Int] = []
+            for run in runs {
+                let take = min(perRun, run.count)
+                pool.append(contentsOf: run.prefix(take))
+                taken.append(take)
+            }
+
+            let ranked = (try? await rankWithModel(pool)) ?? pool
+            result.append(contentsOf: ranked)
+
+            runs = zip(runs, taken).compactMap { run, take in
+                let remaining = Array(run.dropFirst(take))
+                return remaining.isEmpty ? nil : remaining
+            }
+        }
+
+        if let last = runs.first {
+            result.append(contentsOf: last)
+        }
+
+        return result
     }
 
     private func rankWithModel(_ batch: [ReminderItem]) async throws -> [ReminderItem] {
