@@ -53,7 +53,6 @@ struct AIPrioritizer {
             instructions: """
             You rank a person's reminders (to-dos) by true importance and urgency. \
             Weigh due date (overdue and soon-due items are usually more urgent), \
-            whether the reminder is flagged (flagged means the person marked it as important), \
             its explicit priority level if set, and which list/project it belongs to. \
             Use the title and notes to judge real-world stakes and urgency too. \
             Respond only with the requested ranking, nothing else.
@@ -92,7 +91,6 @@ struct AIPrioritizer {
             parts.append("due=none")
         }
 
-        parts.append("flagged=\(item.isFlagged)")
         parts.append("priority=\(item.priorityLevel.rawValue)")
 
         if let notes = item.notes, !notes.isEmpty {

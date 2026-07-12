@@ -7,7 +7,6 @@ enum HeuristicRanker {
         let now = Date()
         func score(_ item: ReminderItem) -> Double {
             var s = 0.0
-            if item.isFlagged { s += 50 }
             switch item.priorityLevel {
             case .high: s += 30
             case .medium: s += 15

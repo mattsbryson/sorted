@@ -31,7 +31,6 @@ final class RemindersService {
             ending: nil,
             calendars: calendars
         )
-        let flagMap = await FlagFetcher.fetchFlags()
 
         // EKReminder isn't Sendable, so it's mapped to the Sendable ReminderItem
         // struct inside the completion closure, before crossing back to this task.
@@ -44,7 +43,6 @@ final class RemindersService {
                         notes: r.notes,
                         dueDate: r.dueDateComponents?.date,
                         rawPriority: Int(r.priority),
-                        isFlagged: flagMap[r.calendarItemIdentifier] ?? false,
                         listName: r.calendar?.title ?? "Reminders"
                     )
                 }
@@ -57,5 +55,10 @@ final class RemindersService {
         guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return }
         reminder.isCompleted = completed
         try store.save(reminder, commit: true)
+    }
+
+    func delete(_ id: String) throws {
+        guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return }
+        try store.remove(reminder, commit: true)
     }
 }

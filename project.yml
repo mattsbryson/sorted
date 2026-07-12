@@ -17,7 +17,6 @@ targets:
         NSHumanReadableCopyright: ""
         LSApplicationCategoryType: public.app-category.productivity
         NSRemindersFullAccessUsageDescription: "RemindSort reads your reminders so it can show and prioritize them."
-        NSAppleEventsUsageDescription: "RemindSort uses Apple Events to read each reminder's flagged status, which Apple's Reminders API does not otherwise expose."
         LSMinimumSystemVersion: "26.0"
         LSUIElement: false
     settings:

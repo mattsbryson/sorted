@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(RemindersViewModel.self) private var viewModel
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -36,11 +37,28 @@ struct HomeView: View {
                             Label("Skip", systemImage: "arrow.uturn.forward.circle")
                         }
                         .buttonStyle(.bordered)
+
+                        Button(role: .destructive) {
+                            showingDeleteConfirmation = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
                     }
                     .controlSize(.large)
                 }
                 .padding(32)
                 .frame(maxWidth: 420)
+                .confirmationDialog(
+                    "Delete “\(reminder.title)”?",
+                    isPresented: $showingDeleteConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Delete", role: .destructive) {
+                        Task { await viewModel.delete(reminder) }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
             } else {
                 ContentUnavailableView(
                     "All Clear",
@@ -76,10 +94,6 @@ private struct ReminderCard: View {
                     .padding(.vertical, 3)
                     .background(.tertiary, in: Capsule())
                 Spacer()
-                if reminder.isFlagged {
-                    Image(systemName: "flag.fill")
-                        .foregroundStyle(.orange)
-                }
                 PriorityBadge(level: reminder.priorityLevel)
             }
 

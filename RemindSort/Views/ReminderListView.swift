@@ -20,6 +20,8 @@ struct ReminderListView: View {
                         ForEach(items) { item in
                             ReminderRow(reminder: item) {
                                 Task { await viewModel.complete(item) }
+                            } onDelete: {
+                                Task { await viewModel.delete(item) }
                             }
                         }
                     }

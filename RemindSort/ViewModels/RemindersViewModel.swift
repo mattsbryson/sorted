@@ -73,12 +73,25 @@ final class RemindersViewModel {
     func complete(_ item: ReminderItem) async {
         do {
             try remindersService.setCompleted(item.id)
-            rankedReminders.removeAll { $0.id == item.id }
-            if homeIndex >= rankedReminders.count {
-                homeIndex = 0
-            }
+            removeLocally(item)
         } catch {
             loadState = .error(error.localizedDescription)
+        }
+    }
+
+    func delete(_ item: ReminderItem) async {
+        do {
+            try remindersService.delete(item.id)
+            removeLocally(item)
+        } catch {
+            loadState = .error(error.localizedDescription)
+        }
+    }
+
+    private func removeLocally(_ item: ReminderItem) {
+        rankedReminders.removeAll { $0.id == item.id }
+        if homeIndex >= rankedReminders.count {
+            homeIndex = 0
         }
     }
 

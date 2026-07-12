@@ -20,7 +20,6 @@ struct ReminderItem: Identifiable, Hashable, Sendable {
     let notes: String?
     let dueDate: Date?
     let rawPriority: Int
-    let isFlagged: Bool
     let listName: String
 
     var priorityLevel: ReminderPriorityLevel { ReminderPriorityLevel(rawPriority: rawPriority) }

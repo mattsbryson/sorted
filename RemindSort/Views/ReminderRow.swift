@@ -27,6 +27,9 @@ struct PriorityBadge: View {
 struct ReminderRow: View {
     let reminder: ReminderItem
     var onComplete: () -> Void
+    var onDelete: () -> Void
+
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -41,11 +44,6 @@ struct ReminderRow: View {
                 HStack(spacing: 6) {
                     Text(reminder.title)
                         .font(.body)
-                    if reminder.isFlagged {
-                        Image(systemName: "flag.fill")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
                     PriorityBadge(level: reminder.priorityLevel)
                 }
 
@@ -70,7 +68,23 @@ struct ReminderRow: View {
             }
 
             Spacer()
+
+            Button(role: .destructive) {
+                showingDeleteConfirmation = true
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 4)
+        .confirmationDialog(
+            "Delete “\(reminder.title)”?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive, action: onDelete)
+            Button("Cancel", role: .cancel) {}
+        }
     }
 }

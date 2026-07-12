@@ -26,8 +26,6 @@
 	<string>26.0</string>
 	<key>LSUIElement</key>
 	<false/>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>RemindSort uses Apple Events to read each reminder's flagged status, which Apple's Reminders API does not otherwise expose.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<key>NSRemindersFullAccessUsageDescription</key>
