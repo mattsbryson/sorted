@@ -1,25 +1,25 @@
-name: RemindSort
+name: Sorted
 options:
   bundleIdPrefix: com.mattbryson
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
 targets:
-  RemindSort:
+  Sorted:
     type: application
     platform: iOS
     sources:
-      - path: RemindSort
+      - path: Sorted
       # Platform-agnostic code shared verbatim with the macOS project — one
       # copy on disk, referenced by both project.ymls.
       - path: ../Shared
     info:
       path: Generated/Info.plist
       properties:
-        CFBundleDisplayName: RemindSort
+        CFBundleDisplayName: Sorted
         NSHumanReadableCopyright: ""
         LSApplicationCategoryType: public.app-category.productivity
-        NSRemindersFullAccessUsageDescription: "RemindSort reads your reminders so it can show and prioritize them."
+        NSRemindersFullAccessUsageDescription: "Sorted reads your reminders so it can show and prioritize them."
         # A visible launch screen shown by iOS the instant the app is
         # tapped, before any code runs. An empty UILaunchScreen dict renders
         # solid systemBackground — pure black in dark mode — which reads as
@@ -30,7 +30,7 @@ targets:
         UIRequiredDeviceCapabilities: [arm64]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mattbryson.RemindSort.iOS
+        PRODUCT_BUNDLE_IDENTIFIER: com.mattbryson.Sorted.iOS
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"

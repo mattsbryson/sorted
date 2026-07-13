@@ -86,7 +86,7 @@ private struct AccessDeniedView: View {
         ContentUnavailableView(
             "Reminders Access Needed",
             systemImage: "list.bullet.clipboard",
-            description: Text("Grant RemindSort access to Reminders in System Settings > Privacy & Security > Reminders, then relaunch the app.")
+            description: Text("Grant Sorted access to Reminders in System Settings > Privacy & Security > Reminders, then relaunch the app.")
         )
     }
 }

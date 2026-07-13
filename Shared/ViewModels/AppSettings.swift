@@ -6,11 +6,11 @@ import Observation
 @Observable
 final class AppSettings {
     private enum Keys {
-        static let todayLimit = "RemindSort.settings.todayLimit"
-        static let showUrgencyScore = "RemindSort.settings.showUrgencyScore"
-        static let considerDueDates = "RemindSort.settings.considerDueDates"
-        static let preferenceLogging = "RemindSort.settings.preferenceLogging"
-        static let faceOffEnabled = "RemindSort.settings.faceOffEnabled"
+        static let todayLimit = "Sorted.settings.todayLimit"
+        static let showUrgencyScore = "Sorted.settings.showUrgencyScore"
+        static let considerDueDates = "Sorted.settings.considerDueDates"
+        static let preferenceLogging = "Sorted.settings.preferenceLogging"
+        static let faceOffEnabled = "Sorted.settings.faceOffEnabled"
     }
 
     static let todayLimitRange = 1...20

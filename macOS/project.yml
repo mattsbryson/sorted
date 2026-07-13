@@ -1,30 +1,30 @@
-name: RemindSort
+name: Sorted
 options:
   bundleIdPrefix: com.mattbryson
   deploymentTarget:
     macOS: "26.0"
   createIntermediateGroups: true
 targets:
-  RemindSort:
+  Sorted:
     type: application
     platform: macOS
     sources:
-      - path: RemindSort
+      - path: Sorted
       # Platform-agnostic code shared verbatim with the iOS project — one
       # copy on disk, referenced by both project.ymls.
       - path: ../Shared
     info:
       path: Generated/Info.plist
       properties:
-        CFBundleDisplayName: RemindSort
+        CFBundleDisplayName: Sorted
         NSHumanReadableCopyright: ""
         LSApplicationCategoryType: public.app-category.productivity
-        NSRemindersFullAccessUsageDescription: "RemindSort reads your reminders so it can show and prioritize them."
+        NSRemindersFullAccessUsageDescription: "Sorted reads your reminders so it can show and prioritize them."
         LSMinimumSystemVersion: "26.0"
         LSUIElement: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mattbryson.RemindSort
+        PRODUCT_BUNDLE_IDENTIFIER: com.mattbryson.Sorted
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
@@ -39,7 +39,7 @@ targets:
   # Standalone logic tests: compiles the scorer's sources straight into the
   # test bundle (no app host), so running tests never launches the app or
   # triggers its Reminders permission prompt.
-  RemindSortTests:
+  SortedTests:
     type: bundle.unit-test
     platform: macOS
     sources:
@@ -53,10 +53,10 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: YES
 schemes:
-  RemindSortTests:
+  SortedTests:
     build:
       targets:
-        RemindSortTests: all
+        SortedTests: all
     test:
       targets:
-        - RemindSortTests
+        - SortedTests

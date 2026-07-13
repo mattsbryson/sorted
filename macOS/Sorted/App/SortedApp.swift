@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct RemindSortApp: App {
+struct SortedApp: App {
     @State private var viewModel = RemindersViewModel()
 
     var body: some Scene {

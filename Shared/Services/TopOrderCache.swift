@@ -9,7 +9,7 @@ import Foundation
 /// passing changes relative urgency, so a cached ordering expires at
 /// midnight even if the reminders don't change.
 enum TopOrderCache {
-    private static let key = "RemindSort.topOrderCache"
+    private static let key = "Sorted.topOrderCache"
 
     private static func cacheKey(for items: [ReminderItem], includesDates: Bool, now: Date) -> String {
         let day = String(Calendar.current.startOfDay(for: now).timeIntervalSince1970)

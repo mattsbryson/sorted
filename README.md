@@ -1,4 +1,4 @@
-# RemindSort
+# Sorted
 
 ## To do
 
@@ -14,8 +14,8 @@ Intelligence), with a deterministic fallback when that's unavailable.
 ```
 Shared/  Platform-agnostic code (Models, Services, ViewModels, shared Views)
          — one copy on disk, compiled into both apps
-macOS/   SwiftUI app for macOS (open macOS/RemindSort.xcodeproj) + unit tests
-iOS/     SwiftUI app for iOS (open iOS/RemindSort.xcodeproj)
+macOS/   SwiftUI app for macOS (open macOS/Sorted.xcodeproj) + unit tests
+iOS/     SwiftUI app for iOS (open iOS/Sorted.xcodeproj)
 ```
 
 The two are independent Xcode projects (generated with
@@ -36,7 +36,7 @@ Unit tests for the deterministic scoring formula live in `macOS/Tests`
 permission prompt):
 
 ```
-cd macOS && xcodebuild test -scheme RemindSortTests -destination 'platform=macOS'
+cd macOS && xcodebuild test -scheme SortedTests -destination 'platform=macOS'
 ```
 
 ## Features
@@ -249,7 +249,7 @@ model-generation activity in the logs after the first full pass.)
 ### Training data (two logs)
 
 Groundwork for the custom-model to-do above. Both logs are JSON Lines (one
-event per line) in `Application Support/RemindSort/`, rotated once at 10 MB,
+event per line) in `Application Support/Sorted/`, rotated once at 10 MB,
 written best-effort off the main actor, and never leave the device unless
 exported. They share their file machinery and per-reminder feature schema
 (`TrainingLog.swift`); each is exportable as a `.jsonl` file from Settings.
@@ -324,11 +324,11 @@ so flagged status isn't used and there's only the one permission prompt.
 
 ## Running it
 
-**macOS**: open `macOS/RemindSort.xcodeproj` in Xcode, select a signing team
+**macOS**: open `macOS/Sorted.xcodeproj` in Xcode, select a signing team
 under Signing & Capabilities, and run (⌘R). No App Sandbox entitlements are
 needed since it isn't distributed through the App Store.
 
-**iOS**: open `iOS/RemindSort.xcodeproj` in Xcode. For the simulator, just
+**iOS**: open `iOS/Sorted.xcodeproj` in Xcode. For the simulator, just
 run. For a physical device: connect via USB, enable Developer Mode on the
 phone (Settings → Privacy & Security → Developer Mode — this option only
 appears after Xcode's first install attempt), set a signing team, select the

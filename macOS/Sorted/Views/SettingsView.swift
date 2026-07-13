@@ -81,13 +81,13 @@ struct SettingsView: View {
             isPresented: $showingLogExporter,
             document: PreferenceLog.ExportDocument(data: PreferenceLog.exportData()),
             contentType: PreferenceLog.exportType,
-            defaultFilename: "RemindSort-preferences"
+            defaultFilename: "Sorted-preferences"
         ) { _ in }
         .fileExporter(
             isPresented: $showingFaceOffExporter,
             document: TrainingLog.ExportDocument(data: FaceOffLog.exportData()),
             contentType: TrainingLog.exportType,
-            defaultFilename: "RemindSort-faceoffs"
+            defaultFilename: "Sorted-faceoffs"
         ) { _ in }
         // Re-rank right away so the new order greets the user on close. No
         // model calls happen here — importance stays cached; only the

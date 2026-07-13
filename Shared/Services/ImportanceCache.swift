@@ -9,9 +9,7 @@ import Foundation
 /// isn't cached at all: it's recomputed from dates on every rank, so scores
 /// can't go stale as due dates approach.
 enum ImportanceCache {
-    private static let key = "RemindSort.importanceCache"
-    /// UserDefaults key of the pre-redesign score cache, cleared on first save.
-    private static let legacyScoreKey = "RemindSort.scoreCache"
+    private static let key = "Sorted.importanceCache"
 
     static func contentHash(for item: ReminderItem) -> String {
         let joined = [item.id, item.title, item.notes ?? "", item.listName]
@@ -48,6 +46,5 @@ enum ImportanceCache {
             }
         }
         UserDefaults.standard.set(stored, forKey: key)
-        UserDefaults.standard.removeObject(forKey: legacyScoreKey)
     }
 }
