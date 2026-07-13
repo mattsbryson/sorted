@@ -10,6 +10,9 @@ targets:
     platform: iOS
     sources:
       - path: RemindSort
+      # Platform-agnostic code shared verbatim with the macOS project — one
+      # copy on disk, referenced by both project.ymls.
+      - path: ../Shared
     info:
       path: Generated/Info.plist
       properties:

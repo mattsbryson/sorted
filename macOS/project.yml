@@ -10,6 +10,9 @@ targets:
     platform: macOS
     sources:
       - path: RemindSort
+      # Platform-agnostic code shared verbatim with the iOS project — one
+      # copy on disk, referenced by both project.ymls.
+      - path: ../Shared
     info:
       path: Generated/Info.plist
       properties:
@@ -30,3 +33,27 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: NO
+  # Standalone logic tests: compiles the scorer's sources straight into the
+  # test bundle (no app host), so running tests never launches the app or
+  # triggers its Reminders permission prompt.
+  RemindSortTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+      - path: ../Shared/Models/ReminderItem.swift
+      - path: ../Shared/Models/ImportanceTiers.swift
+      - path: ../Shared/Services/UrgencyScorer.swift
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  RemindSortTests:
+    build:
+      targets:
+        RemindSortTests: all
+    test:
+      targets:
+        - RemindSortTests

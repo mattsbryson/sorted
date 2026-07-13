@@ -12,21 +12,31 @@ Intelligence), with a deterministic fallback when that's unavailable.
 ## Project layout
 
 ```
-macOS/   SwiftUI app for macOS (open macOS/RemindSort.xcodeproj)
+Shared/  Platform-agnostic code (Models, Services, ViewModels, shared Views)
+         — one copy on disk, compiled into both apps
+macOS/   SwiftUI app for macOS (open macOS/RemindSort.xcodeproj) + unit tests
 iOS/     SwiftUI app for iOS (open iOS/RemindSort.xcodeproj)
 ```
 
 The two are independent Xcode projects (generated with
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) from each folder's
-`project.yml`), but share the same architecture and, for the
-platform-agnostic files (Models, Services, ViewModel, and most Views), the
-same source. Only the app entry point and Home screen's button layout differ
-between platforms.
+`project.yml`), and both reference `Shared/` directly — there is exactly one
+copy of the platform-agnostic source, so the platforms can't silently
+diverge. Only the app entry point, `ContentView`, `HomeView`, and
+`SettingsView` are per-platform.
 
 To regenerate either project after editing its `project.yml`:
 
 ```
 cd macOS && xcodegen generate   # or: cd iOS && xcodegen generate
+```
+
+Unit tests for the deterministic scoring formula live in `macOS/Tests`
+(standalone bundle — running them never launches the app or triggers its
+permission prompt):
+
+```
+cd macOS && xcodebuild test -scheme RemindSortTests -destination 'platform=macOS'
 ```
 
 ## Features
