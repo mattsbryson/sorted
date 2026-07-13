@@ -18,13 +18,22 @@ struct AIPrioritizer {
     private static let reorderCount = 15
 
     static var availability: AIAvailability {
+        // Shared across platforms, so device/settings naming is resolved at
+        // compile time — an iPhone shouldn't be told about "This Mac".
+        #if os(macOS)
+        let device = "Mac"
+        let settingsApp = "System Settings"
+        #else
+        let device = "device"
+        let settingsApp = "Settings"
+        #endif
         switch SystemLanguageModel.default.availability {
         case .available:
             return .available
         case .unavailable(.deviceNotEligible):
-            return .unavailable("This Mac doesn't support Apple Intelligence.")
+            return .unavailable("This \(device) doesn't support Apple Intelligence.")
         case .unavailable(.appleIntelligenceNotEnabled):
-            return .unavailable("Turn on Apple Intelligence in System Settings to enable AI sorting.")
+            return .unavailable("Turn on Apple Intelligence in \(settingsApp) to enable AI sorting.")
         case .unavailable(.modelNotReady):
             return .unavailable("Apple Intelligence model is still downloading. Using basic sorting for now.")
         case .unavailable:

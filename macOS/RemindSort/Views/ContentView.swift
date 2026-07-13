@@ -16,13 +16,26 @@ struct ContentView: View {
                 AccessDeniedView()
             case .error(let message):
                 ContentUnavailableView("Something Went Wrong", systemImage: "exclamationmark.triangle", description: Text(message))
-            case .needsAccess, .loaded:
+            case .loaded:
                 tabs
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .task {
             await viewModel.start()
+        }
+        // Failed complete/delete/snooze surfaces here, over the intact UI —
+        // only failures to load at all replace the screen.
+        .alert(
+            "Couldn't Update Reminder",
+            isPresented: Binding(
+                get: { viewModel.actionError != nil },
+                set: { if !$0 { viewModel.dismissActionError() } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.actionError ?? "")
         }
     }
 

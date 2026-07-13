@@ -3,7 +3,6 @@ import Observation
 
 enum LoadState: Equatable {
     case idle
-    case needsAccess
     case accessDenied
     case loading
     case loaded
@@ -17,6 +16,10 @@ final class RemindersViewModel {
     private(set) var rankedReminders: [ReminderItem] = []
     private(set) var homeIndex: Int = 0
     private(set) var aiNote: String?
+    /// A failed user action (complete/delete/snooze). Shown as an alert
+    /// over the intact UI — unlike `loadState = .error`, which replaces the
+    /// whole screen and is reserved for failures to load at all.
+    private(set) var actionError: String?
 
     let settings = AppSettings()
 
@@ -182,7 +185,7 @@ final class RemindersViewModel {
             )
             removeLocally(item)
         } catch {
-            loadState = .error(error.localizedDescription)
+            actionError = error.localizedDescription
         }
     }
 
@@ -197,8 +200,12 @@ final class RemindersViewModel {
             )
             removeLocally(item)
         } catch {
-            loadState = .error(error.localizedDescription)
+            actionError = error.localizedDescription
         }
+    }
+
+    func dismissActionError() {
+        actionError = nil
     }
 
     /// Pushes the reminder's due date to (now + amount of unit). Patches the
@@ -235,7 +242,7 @@ final class RemindersViewModel {
                 homeIndex = 0
             }
         } catch {
-            loadState = .error(error.localizedDescription)
+            actionError = error.localizedDescription
         }
     }
 
