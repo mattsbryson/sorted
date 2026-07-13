@@ -6,14 +6,12 @@ struct ContentView: View {
     var body: some View {
         Group {
             switch viewModel.loadState {
-            case .idle:
-                // Brief (permission check + EventKit fetch only) — no progress
-                // bar/messaging here, that's reserved for an actual AI pass.
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemBackground))
-            case .loading:
-                LoadingView(progress: viewModel.rankingProgress)
+            case .idle, .loading:
+                // One full-screen loading view from the very first frame
+                // through the AI pass — idle (permission check) and loading
+                // (fetch + ranking) look identical, so there's never a blank
+                // screen in between.
+                LoadingView()
             case .accessDenied:
                 AccessDeniedView()
             case .error(let message):
@@ -38,23 +36,20 @@ struct ContentView: View {
             }
             .tabItem { Label("Today", systemImage: "sun.max.fill") }
 
-            ReminderListView(title: "Upcoming", items: viewModel.upcomingItems)
+            ReminderListView(title: "Upcoming", items: viewModel.upcomingItems, searchable: true)
                 .tabItem { Label("Upcoming", systemImage: "calendar") }
 
-            ReminderListView(title: "Someday", items: viewModel.somedayItems)
+            ReminderListView(title: "Someday", items: viewModel.somedayItems, searchable: true)
                 .tabItem { Label("Someday", systemImage: "tray.fill") }
         }
     }
 }
 
 private struct LoadingView: View {
-    let progress: Double
-
     var body: some View {
         VStack(spacing: 16) {
-            ProgressView(value: progress)
-                .progressViewStyle(.linear)
-                .frame(maxWidth: 240)
+            ProgressView()
+                .controlSize(.large)
 
             Text("Reminders are being processed and sorted…")
                 .font(.subheadline)

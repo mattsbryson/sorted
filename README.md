@@ -1,5 +1,10 @@
 # RemindSort
 
+## To do
+
+- Write and train our own model for reminder sorting, and deploy that.
+- Allow user input for training in the app.
+
 A native app (macOS and iOS) that reads your Apple Reminders and ranks them by
 importance using Apple's on-device Foundation Models framework (Apple
 Intelligence), with a deterministic fallback when that's unavailable.
@@ -35,8 +40,10 @@ cd macOS && xcodegen generate   # or: cd iOS && xcodegen generate
     control on macOS, since SwiftUI's wheel picker style is iOS-only) to pick
     an amount and a unit (Day/Week/Month), then pushes the reminder's due
     date to *now + that amount* in Reminders. Updates instantly in the UI
-    without a full re-rank; the next real refresh re-ranks normally since the
-    due date change invalidates the ranking cache.
+    without a full re-rank; the next real refresh re-ranks normally, and
+    since due dates aren't part of what the AI judges (see below), snoozing
+    costs zero model calls — only the deterministic time component of the
+    score changes.
   - **Complete** marks it done in Reminders and advances to the next one.
   - **Skip** cycles to the next-most-important reminder without changing
     anything in Reminders (wraps back to the top after the last one).
@@ -49,6 +56,24 @@ cd macOS && xcodegen generate   # or: cd iOS && xcodegen generate
 - **Upcoming** — all reminders with a future due date, in ranked order.
 - **Someday** — all reminders with no due date at all, in ranked order.
 
+Upcoming and Someday have a **search field** (filtering by title, notes, and
+list name) since those lists grow long; Today is already a short curated
+slice.
+
+### Live updates
+
+The app observes EventKit's change notification (`EKEventStoreChanged`), so
+reminders added, edited, or completed elsewhere — in Reminders.app, via
+Siri, or synced in from iCloud — flow in automatically: a debounced (1.5s)
+**quiet refresh** re-fetches and re-ranks *without* flashing the loading
+screen or resetting session state (Today's swiped-away skips are kept; the
+reminder showing on Home keeps its spot if it still exists). New reminders
+get classified and slotted into ranked order as part of the same pass;
+everything already cached stays instant. EventKit also fires this
+notification for the app's own writes (complete/snooze/delete), which is
+harmless — the quiet refresh just converges on the same state the UI
+already shows.
+
 ### Settings
 
 A gear icon in Home's toolbar opens Settings (`AppSettings.swift`, persisted
@@ -59,6 +84,18 @@ via `UserDefaults`):
 - **Show urgency score** — a toggle that displays each reminder's 0-100
   urgency score as a colored badge (red 67+, orange 34-66, blue below) next
   to its priority badge, on Home and in the list tabs.
+- **Consider due dates in ranking** — on by default. When off, the time
+  axis is dropped from scoring entirely (due dates, overdue status, and the
+  undated-item neglect bonus) and reminders are ranked purely by the AI's
+  importance judgment of what each task is. Toggling it re-ranks
+  immediately — importance stays cached, so no model calls are involved,
+  only the deterministic score composition changes. Same-importance items
+  still order by earlier due date as a tie-break.
+- **Log ranking feedback** — on by default; toggles the preference log
+  described below. **Export Log…** next to it saves the accumulated log
+  (including any rotated history, in chronological order) via the standard
+  save panel (macOS) / Files sheet (iOS) as a `.jsonl` file. The button is
+  disabled until at least one event has been logged.
 
 All four tabs draw from one shared ranking pass, so Home and the tab buckets
 always agree on relative importance.
@@ -69,31 +106,66 @@ Ranking is done by Apple's **Foundation Models** framework
 (`SystemLanguageModel` / `LanguageModelSession`), the on-device LLM behind
 Apple Intelligence — no network calls, nothing leaves the device.
 
-**Tiered classification, not raw scoring.** Earlier versions asked the model
-directly for a 0-100 urgency number. In practice this didn't hold up: scores
-clustered near the top of the range, and the model over-weighted incidental
-signals like the explicit priority flag (see below). A raw, well-calibrated
-magnitude estimate turns out to be a harder, less reliable task for a small
-on-device model (~3B parameters) than a coarse categorical judgment. So the
-model's job now is narrower: classify each reminder into one of five urgency
-**tiers** — critical, high, medium, low, minimal (`UrgencyTier` in
-`Models/UrgencyTiers.swift`) — each mapped to a fixed score band (critical =
-90-100, high = 70-89, medium = 45-69, low = 20-44, minimal = 0-19). The final
-0-100 score is then computed in code: reminders sharing a tier are spread
-across that tier's band by the deterministic due-date heuristic, most urgent
-first. The model decides *how urgent, roughly*; code decides *exactly where
-in that ballpark*, using precise date math the model can't reliably do.
+**Importance and time urgency, judged separately.** Earlier versions asked
+the model for a single combined urgency judgment — first as a raw 0-100
+score (scores clustered near the top and over-weighted incidental signals),
+then as a coarse urgency tier (better, but the tier rubric still asked the
+model to fold due-date proximity into its judgment — exactly the kind of
+date reasoning a small on-device model, ~3B parameters, is worst at, and it
+produced misfires like a same-day reminder landing in a lower tier than a
+next-day one). Combined judgments also had to be cached whole, so a score
+assigned when a reminder was due in three weeks stayed frozen as the due
+date arrived. The current design splits ranking into two independent axes,
+each handled by the part of the system that's actually good at it:
 
-For each reminder, the model is given:
+- **Importance** — real-world stakes: how much it matters that the task
+  ever gets done. Judged by the model from the title, notes, and list
+  *only* — no dates in the prompt at all — into one of four tiers:
+  critical, high, normal, low (`ImportanceTier` in
+  `Models/ImportanceTiers.swift`). Because the judgment is date-blind by
+  construction, it stays valid until the reminder's content changes, no
+  matter how much time passes or how often it's rescheduled.
+- **Time urgency** — computed deterministically in code (`UrgencyScorer`)
+  from precise calendar-day math, fresh on every rank: overdue maps to
+  0.75-1.0 (being overdue at all is the strong signal; extra days add a
+  little more, capped at two weeks so long-abandoned items can't drown out
+  everything else), due today is 0.70 (always above any future date), future
+  due dates fade linearly to zero a month out, and undated reminders get a
+  small neglect bonus growing with age since creation so long-forgotten
+  items drift up rather than sitting at the bottom forever.
 
-- Title and notes
-- Due date and creation date, as **relative offsets from today** ("due in 3
-  days", "overdue by 12 days", "created 45 days ago") computed by the app,
-  not raw calendar dates — on-device models are unreliable at date
-  arithmetic, so this removes that failure mode entirely. Creation date lets
-  long-neglected reminders (especially ones with no due date) get weighed
-  instead of sitting forgotten forever.
-- Which Reminders list it belongs to
+The final 0-100 score combines them: `55% × time urgency + 45% × importance`
+(with tier weights critical 1.0, high 0.7, normal 0.4, low 0.15). Ties break
+by earlier due date, then stable fetch order. The weighting means an overdue
+trivial errand surfaces, but a genuinely important task due this week still
+outranks it — and because the time component is recomputed on every rank, a
+reminder drifting toward its due date climbs the ranking day by day with no
+model call and no cache invalidation. (A Settings toggle, "Consider due
+dates in ranking," drops the time axis entirely for stakes-only ranking —
+see Settings above.)
+
+This structurally removes the failure modes documented against the previous
+design: a same-day reminder can never rank below a next-day one of equal
+importance (dates never pass through the model), long-overdue low-stakes
+items can't outrank recently-overdue important ones (the overdue bonus is
+capped and importance is weighted in), and scores can't go stale (time is
+recomputed each rank).
+
+**A listwise re-rank of the top of the list.** Per-item classification into
+coarse tiers is reliable but throws away *comparative* judgment — and the
+best-feeling ranking this app ever had (the old 40-per-batch era) got its
+quality precisely from the model seeing many reminders side by side. So
+after deterministic scoring picks *which* ~15 reminders matter most, one
+extra model call orders that group as a whole, weighing stakes and timing
+together (this pass, unlike importance classification, does see due/creation
+dates — as app-computed relative offsets). The group's existing scores are
+reassigned in the new order so displayed scores stay monotonic. The result
+is cached per candidate set per calendar day (`TopOrderCache`) — same-day
+relaunches with unchanged data cost no model call, but the ordering
+naturally refreshes at midnight since relative urgency shifts as time
+passes. If the call fails or Apple Intelligence is unavailable, the
+deterministic order simply stands. (When "Consider due dates in ranking" is
+off, the pass still runs but judges content only, cached separately.)
 
 The reminder's explicit priority field (`EKReminder.priority` — the
 none/low/medium/high flag you can set in Reminders.app, read directly via
@@ -101,9 +173,8 @@ EventKit's public API, no scripting involved) is deliberately **not** sent
 to the model — an earlier test showed it being weighted too heavily,
 scoring reminders close to 100 just for being marked high-priority even
 when due weeks or months out. Priority is still shown in the UI
-(`PriorityBadge`) and still used by the heuristic (both as the classification
-fallback and for within-tier ordering, see below); it's only excluded from
-what the AI classification call sees.
+(`PriorityBadge`) and still seeds the fallback importance (below); it's only
+excluded from what the AI classification call sees.
 
 The model's context window can't hold an unlimited number of reminders in one
 call, so classification is split into chunks of at most 15 (kept
@@ -116,64 +187,86 @@ split this into a batched pass followed by a slower background per-item pass
 now in favor of one straightforward pass, with a loading screen covering it.
 
 If Apple Intelligence isn't available (unsupported hardware, not enabled in
-System Settings, or the on-device model is still downloading), or a given
-model call fails, ranking falls back to a deterministic heuristic score
-(priority level + overdue/due-soon proximity) for the affected reminders —
-the app still works, it just won't be AI-classified, and a small note
-explains why on the Home screen when AI is unavailable entirely. The same
-heuristic also supplies a coarse fallback tier for any reminder the model's
-response happens to omit.
+System Settings, or the on-device model is still downloading), a model call
+fails, or the model omits a reminder from its response, the affected
+reminders get a fallback importance derived from the explicit priority flag
+(high → high, medium/none → normal, low → low) and flow through the same
+scoring formula — so even the fallback ranking respects due dates properly.
+Fallback importances are computed fresh each rank and never cached, so they
+self-correct the moment the model can actually judge the item. A small note
+explains why on the Home screen when AI is unavailable entirely.
 
-**Known remaining imperfections**, found via a deliberately varied 8-reminder
-test set rather than assumed: a same-day reminder was classified into the
-"low" tier, ranking below a next-day one in "medium" — a plausible tier
-mis-classification, not a placement bug. Separately, the within-tier
-heuristic ordering favors raw overdue duration without an upper bound, which
-let a low-priority reminder overdue by a month outrank a high-priority one
-overdue by less time, even though the tiers themselves were reasonable.
-Worth revisiting either the tier rubric or capping the heuristic's overdue
-bonus if this is still noticeably off in practice.
+### Importance cache
 
-**Status: ranking quality is still under active reconsideration.** Tiered
-classification (this section) is the current approach and is a real
-improvement over raw 0-100 scoring, but it hasn't converged on something
-fully satisfying yet — the two issues above are illustrative, not
-necessarily exhaustive. Before extending or further tuning this system
-(rubric wording, tier bands, the heuristic formula, or a different approach
-altogether), check in on direction rather than assuming the current design
-is settled.
+Running the on-device model takes several seconds, so each reminder's AI
+importance tier is cached **individually**, keyed by a content hash of
+exactly what the model judges (`ImportanceCache.swift`, persisted via
+`UserDefaults`) — title, notes, and list. Due date, priority, and creation
+date are deliberately excluded from the hash: importance is date-blind, so
+snoozing or rescheduling never forces a re-classification. On the next
+launch or manual refresh:
 
-### Ranking cache
-
-Running the on-device model takes several seconds, so each reminder's score
-is cached **individually**, keyed by a content hash of that reminder alone
-(`ScoreCache.swift`, persisted via `UserDefaults`) — title, notes, due date,
-priority, and list. On the next launch or manual refresh:
-
-- Reminders whose hash matches a cached entry reuse that score instantly —
-  no model call.
-- Only reminders that are new or have a changed hash (edited title/notes/due
-  date/priority/list) get sent to the model. If none did, refresh is
-  effectively instant with zero model calls.
+- Reminders whose hash matches a cached entry reuse that importance
+  instantly — no model call. The score itself is *always* recomputed from
+  current dates, cached importance or not.
+- Only reminders that are new or have a changed hash (edited
+  title/notes/list) get sent to the model. If none did, refresh is
+  effectively instant with zero model calls — except the first refresh of
+  each calendar day, which redoes the one listwise re-rank call (see
+  above).
 - The cache is rewritten from scratch each save, scoped to exactly the
   current reminder set, so entries for completed/deleted/edited-away
   reminders never pile up.
 
 This is deliberately simpler than reconstructing or merging a previous
 ordering: there's no ordering to reconstruct at all, just a hash lookup per
-reminder and a plain sort by score at the end — verified on-device (iOS
-Simulator) across repeated launches with unchanged data: zero model-generation
-activity in the logs on the second and third launch after the first full
-scoring pass.
+reminder, a recomputed time component, and a plain sort by score at the end.
+(The predecessor score cache, which worked the same way structurally, was
+verified on-device across repeated launches with unchanged data: zero
+model-generation activity in the logs after the first full pass.)
+
+### Preference logging (training data)
+
+Groundwork for the custom-model to-do above: every ranking-feedback action —
+**Complete**, **Skip** (Home), swipe-skip (Today), **Snooze**, **Delete** —
+is appended to an on-device log (`PreferenceLog.swift`) together with the
+ranked context the user was looking at when they did it (top 10: position,
+title, truncated notes, list, due/created day offsets, priority flag,
+score). Each action is an implicit preference judgment — completing the top
+item endorses the ranking, skipping it says something below deserved the
+spot — so the log accumulates exactly the pairwise-preference data a
+learning-to-rank model trains on.
+
+Format is JSON Lines (one event per line) at
+`Application Support/RemindSort/preferences.jsonl`, rotated once at 10 MB.
+Writes are best-effort, off the main actor, and the data never leaves the
+device unless exported. Logging can be turned off in Settings ("Log ranking
+feedback", enforced at a single gate in the view model), and the whole log
+can be exported from Settings as a `.jsonl` file for training work.
 
 ### Loading screen
 
-Because classification is a single synchronous pass now, `refresh()` always
-shows the full-screen progress bar ("Reminders are being processed and
-sorted…") while it runs. If everything's already cached, `rank(_:)` returns
-essentially instantly and the screen just flashes through; if there's real
-classification work to do, the progress bar tracks actual batch completion
-so it's not just a spinner.
+Because classification is a single synchronous pass, `refresh()` always
+shows a full-screen spinner ("Reminders are being processed and sorted…")
+while it runs. If everything's already cached, `rank(_:)` returns
+essentially instantly and the screen just flashes through. The same view
+covers the brief initial permission-check phase too, so there's never a
+blank window between launch and content. On iOS, the window before *that* —
+process cold start, which can run several seconds on a device — is covered
+by a static launch screen (`UILaunchScreen` in `iOS/project.yml`) showing a
+centered star (`Assets.xcassets/LaunchIcon.imageset`); an empty launch
+screen renders solid systemBackground, which in dark mode is
+indistinguishable from a hung black screen.
+
+Note: the launch screen only masks the cold start, it doesn't shorten it.
+Most of that 5-10s on a physical iPhone is debug-build loading plus
+on-device signature verification from free Apple ID signing — a Release
+build and/or a paid Developer Program signing profile would cut it
+substantially. (An earlier version showed a
+per-batch progress bar instead, and checked Foundation Models availability
+synchronously on the main actor at startup — that check can take a
+noticeable moment on first access, which blocked the first frame and left
+the window blank. The check now runs off the main actor.)
 
 ### Swipe-to-skip (Today tab)
 
@@ -203,7 +296,7 @@ so flagged status isn't used and there's only the one permission prompt.
 - Xcode 26+
 - For AI-based ranking: a Mac or iPhone that supports Apple Intelligence,
   with it enabled in System Settings. Older/unsupported hardware still runs
-  the app fine via the heuristic fallback.
+  the app fine via the deterministic fallback.
 
 ## Running it
 

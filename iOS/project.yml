@@ -17,7 +17,13 @@ targets:
         NSHumanReadableCopyright: ""
         LSApplicationCategoryType: public.app-category.productivity
         NSRemindersFullAccessUsageDescription: "RemindSort reads your reminders so it can show and prioritize them."
-        UILaunchScreen: {}
+        # A visible launch screen shown by iOS the instant the app is
+        # tapped, before any code runs. An empty UILaunchScreen dict renders
+        # solid systemBackground — pure black in dark mode — which reads as
+        # a hung app during the several seconds a cold start takes on
+        # device. The centered star makes it obviously alive.
+        UILaunchScreen:
+          UIImageName: LaunchIcon
         UIRequiredDeviceCapabilities: [arm64]
     settings:
       base:

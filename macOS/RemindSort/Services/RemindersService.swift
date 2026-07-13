@@ -24,6 +24,21 @@ final class RemindersService {
         }
     }
 
+    /// Calls `handler` (on the main actor) whenever the underlying EventKit
+    /// store reports a change — reminders added, edited, or completed in
+    /// Reminders.app, synced in via iCloud, or written by this app itself.
+    /// EventKit doesn't say *what* changed, only that something did, so
+    /// callers re-fetch and reconcile.
+    func observeChanges(_ handler: @escaping @MainActor @Sendable () -> Void) {
+        NotificationCenter.default.addObserver(
+            forName: .EKEventStoreChanged,
+            object: store,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in handler() }
+        }
+    }
+
     func fetchIncompleteReminders() async throws -> [ReminderItem] {
         let calendars = store.calendars(for: .reminder)
         let predicate = store.predicateForIncompleteReminders(

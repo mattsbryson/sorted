@@ -27,7 +27,10 @@
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>RemindSort reads your reminders so it can show and prioritize them.</string>
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIImageName</key>
+		<string>LaunchIcon</string>
+	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>

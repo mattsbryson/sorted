@@ -8,6 +8,8 @@ final class AppSettings {
     private enum Keys {
         static let todayLimit = "RemindSort.settings.todayLimit"
         static let showUrgencyScore = "RemindSort.settings.showUrgencyScore"
+        static let considerDueDates = "RemindSort.settings.considerDueDates"
+        static let preferenceLogging = "RemindSort.settings.preferenceLogging"
     }
 
     static let todayLimitRange = 1...20
@@ -27,6 +29,20 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(showUrgencyScore, forKey: Keys.showUrgencyScore) }
     }
 
+    /// When false, ranking ignores the time axis entirely (due dates,
+    /// overdue status, and the undated-item neglect bonus) and sorts purely
+    /// by importance. On by default.
+    var considerDueDates: Bool {
+        didSet { UserDefaults.standard.set(considerDueDates, forKey: Keys.considerDueDates) }
+    }
+
+    /// When true (default), ranking-feedback events (skip/complete/snooze/
+    /// delete plus the ranked context) are appended to the on-device
+    /// preference log — future training data for a custom ranking model.
+    var preferenceLogging: Bool {
+        didSet { UserDefaults.standard.set(preferenceLogging, forKey: Keys.preferenceLogging) }
+    }
+
     init() {
         let defaults = UserDefaults.standard
         if let stored = defaults.object(forKey: Keys.todayLimit) as? Int {
@@ -35,5 +51,7 @@ final class AppSettings {
             todayLimit = 5
         }
         showUrgencyScore = defaults.bool(forKey: Keys.showUrgencyScore)
+        considerDueDates = (defaults.object(forKey: Keys.considerDueDates) as? Bool) ?? true
+        preferenceLogging = (defaults.object(forKey: Keys.preferenceLogging) as? Bool) ?? true
     }
 }
