@@ -232,6 +232,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					45D02032CE6B69A9652D1277 = {
+						DevelopmentTeam = A9K8GZ46Y9;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -455,6 +456,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A9K8GZ46Y9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;
@@ -478,6 +480,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A9K8GZ46Y9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;

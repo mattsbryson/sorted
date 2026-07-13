@@ -36,6 +36,9 @@ targets:
         SWIFT_VERSION: "6.0"
         IPHONEOS_DEPLOYMENT_TARGET: "26.0"
         CODE_SIGN_STYLE: Automatic
+        # Signing team, kept here (not just in the generated .pbxproj) so it
+        # survives `xcodegen generate`. Change this to your own team ID.
+        DEVELOPMENT_TEAM: A9K8GZ46Y9
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: NO
