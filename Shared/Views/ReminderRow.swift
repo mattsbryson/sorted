@@ -105,12 +105,14 @@ struct ReminderRow: View {
         }
         .padding(.vertical, 4)
         .confirmationDialog(
-            "Delete “\(reminder.title)”?",
+            "Delete Reminder?",
             isPresented: $showingDeleteConfirmation,
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive, action: onDelete)
             Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It’ll move to Recently Deleted in Reminders, where you can still recover it.")
         }
     }
 }

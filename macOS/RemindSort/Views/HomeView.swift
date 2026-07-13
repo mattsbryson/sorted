@@ -92,7 +92,7 @@ struct HomeView: View {
                 .padding(32)
                 .frame(maxWidth: 420)
                 .confirmationDialog(
-                    "Delete “\(reminder.title)”?",
+                    "Delete Reminder?",
                     isPresented: $showingDeleteConfirmation,
                     titleVisibility: .visible
                 ) {
@@ -100,6 +100,8 @@ struct HomeView: View {
                         Task { await viewModel.delete(reminder) }
                     }
                     Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("It’ll move to Recently Deleted in Reminders, where you can still recover it.")
                 }
             } else {
                 ContentUnavailableView(
