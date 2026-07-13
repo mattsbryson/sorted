@@ -20,6 +20,9 @@ final class RemindersViewModel {
     /// over the intact UI — unlike `loadState = .error`, which replaces the
     /// whole screen and is reserved for failures to load at all.
     private(set) var actionError: String?
+    /// Every Reminders list title (including empty and ignored ones), for
+    /// the per-list ignore toggles in Settings. Refreshed on each load.
+    private(set) var availableLists: [String] = []
 
     let settings = AppSettings()
 
@@ -91,7 +94,7 @@ final class RemindersViewModel {
         // flashes through.
         loadState = .loading
         do {
-            let items = try await remindersService.fetchIncompleteReminders()
+            let items = try await fetchVisibleReminders()
             rankedReminders = await prioritizer.rank(
                 items,
                 consideringDueDates: settings.considerDueDates
@@ -102,6 +105,16 @@ final class RemindersViewModel {
         } catch {
             loadState = .error(error.localizedDescription)
         }
+    }
+
+    /// Fetches incomplete reminders, refreshes the known list of lists (for
+    /// Settings), and drops reminders in lists the user has chosen to ignore
+    /// — so ignored lists are excluded everywhere, before ranking even runs.
+    private func fetchVisibleReminders() async throws -> [ReminderItem] {
+        let items = try await remindersService.fetchIncompleteReminders()
+        availableLists = remindersService.availableListNames()
+        guard !settings.ignoredLists.isEmpty else { return items }
+        return items.filter { !settings.ignoredLists.contains($0.listName) }
     }
 
     /// EventKit fires bursts of change notifications (a single edit can
@@ -125,7 +138,7 @@ final class RemindersViewModel {
         // Only reconcile on top of a settled UI; a user-initiated refresh
         // already fetches the latest state itself.
         guard loadState == .loaded else { return }
-        guard let items = try? await remindersService.fetchIncompleteReminders() else { return }
+        guard let items = try? await fetchVisibleReminders() else { return }
         let homeID = homeReminder?.id
         let ranked = await prioritizer.rank(items, consideringDueDates: settings.considerDueDates)
         guard loadState == .loaded else { return }

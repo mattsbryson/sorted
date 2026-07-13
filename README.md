@@ -117,6 +117,12 @@ via `UserDefaults`):
 - **Show Face Off tab** — off by default; adds the Face Off tab described
   above. **Export Face-Off Log…** next to it exports the pairwise-judgment
   log the same way, as a separate `.jsonl` file.
+- **Lists** — one toggle per Reminders list (fetched live from EventKit,
+  including empty lists). Turning a list off adds it to an ignored set;
+  reminders in ignored lists are filtered out *before* ranking, so they
+  appear nowhere in the app (not Home, Today, Upcoming, Someday, or Face
+  Off). Toggling re-runs the ranking pass immediately. Stored by list title
+  in `AppSettings.ignoredLists`.
 
 The list tabs draw from one shared ranking pass, so Home and the buckets
 always agree on relative importance.

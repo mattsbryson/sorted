@@ -11,6 +11,7 @@ final class AppSettings {
         static let considerDueDates = "Sorted.settings.considerDueDates"
         static let preferenceLogging = "Sorted.settings.preferenceLogging"
         static let faceOffEnabled = "Sorted.settings.faceOffEnabled"
+        static let ignoredLists = "Sorted.settings.ignoredLists"
     }
 
     static let todayLimitRange = 1...20
@@ -52,6 +53,26 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(faceOffEnabled, forKey: Keys.faceOffEnabled) }
     }
 
+    /// Titles of Reminders lists the user has chosen to hide. Reminders in
+    /// these lists are filtered out before ranking, so they appear nowhere
+    /// in the app. Keyed by list title (EventKit's stable identifiers aren't
+    /// exposed for lists here, and titles are what the user recognizes).
+    var ignoredLists: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(ignoredLists), forKey: Keys.ignoredLists)
+        }
+    }
+
+    func isListIgnored(_ list: String) -> Bool { ignoredLists.contains(list) }
+
+    func setList(_ list: String, ignored: Bool) {
+        if ignored {
+            ignoredLists.insert(list)
+        } else {
+            ignoredLists.remove(list)
+        }
+    }
+
     init() {
         let defaults = UserDefaults.standard
         if let stored = defaults.object(forKey: Keys.todayLimit) as? Int {
@@ -63,5 +84,6 @@ final class AppSettings {
         considerDueDates = (defaults.object(forKey: Keys.considerDueDates) as? Bool) ?? true
         preferenceLogging = (defaults.object(forKey: Keys.preferenceLogging) as? Bool) ?? true
         faceOffEnabled = defaults.bool(forKey: Keys.faceOffEnabled)
+        ignoredLists = Set(defaults.stringArray(forKey: Keys.ignoredLists) ?? [])
     }
 }

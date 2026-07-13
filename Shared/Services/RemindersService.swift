@@ -39,6 +39,13 @@ final class RemindersService {
         }
     }
 
+    /// Titles of every Reminders list, in the store's own order. Used by
+    /// Settings to offer per-list ignore toggles — includes empty lists,
+    /// which deriving names from fetched reminders alone would miss.
+    func availableListNames() -> [String] {
+        store.calendars(for: .reminder).map { $0.title }
+    }
+
     func fetchIncompleteReminders() async throws -> [ReminderItem] {
         let calendars = store.calendars(for: .reminder)
         let predicate = store.predicateForIncompleteReminders(

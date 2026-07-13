@@ -54,6 +54,21 @@ struct SettingsView: View {
                 } footer: {
                     Text("Adds a tab where you pick the more important of two reminders. Each pick is saved on this device as a direct comparison — the cleanest training data for a personalized ranking model.")
                 }
+
+                if !viewModel.availableLists.isEmpty {
+                    Section {
+                        ForEach(viewModel.availableLists, id: \.self) { list in
+                            Toggle(list, isOn: Binding(
+                                get: { !settings.isListIgnored(list) },
+                                set: { settings.setList(list, ignored: !$0) }
+                            ))
+                        }
+                    } header: {
+                        Text("Lists")
+                    } footer: {
+                        Text("Turn a list off to hide its reminders everywhere in the app.")
+                    }
+                }
             }
             .navigationTitle("Settings")
             .fileExporter(
@@ -72,6 +87,11 @@ struct SettingsView: View {
             // No model calls happen here — importance stays cached; only the
             // deterministic score composition changes.
             .onChange(of: settings.considerDueDates) {
+                Task { await viewModel.refresh() }
+            }
+            // Hiding/showing a list changes which reminders exist for
+            // ranking, so re-run the pass to reflect it immediately.
+            .onChange(of: settings.ignoredLists) {
                 Task { await viewModel.refresh() }
             }
             .toolbar {

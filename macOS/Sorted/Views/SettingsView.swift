@@ -11,10 +11,12 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var settings = settings
 
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Settings")
                 .font(.title2.weight(.semibold))
 
+            ScrollView {
+             VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Stepper(
                     "Reminders shown in Today: \(settings.todayLimit)",
@@ -66,7 +68,23 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
+            if !viewModel.availableLists.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Lists")
+                        .font(.subheadline.weight(.medium))
+                    ForEach(viewModel.availableLists, id: \.self) { list in
+                        Toggle(list, isOn: Binding(
+                            get: { !settings.isListIgnored(list) },
+                            set: { settings.setList(list, ignored: !$0) }
+                        ))
+                    }
+                    Text("Turn a list off to hide its reminders everywhere in the app.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+             }
+            }
 
             HStack {
                 Spacer()
@@ -76,7 +94,7 @@ struct SettingsView: View {
             }
         }
         .padding(24)
-        .frame(width: 360, height: 580)
+        .frame(width: 360, height: 600)
         .fileExporter(
             isPresented: $showingLogExporter,
             document: PreferenceLog.ExportDocument(data: PreferenceLog.exportData()),
@@ -93,6 +111,11 @@ struct SettingsView: View {
         // model calls happen here — importance stays cached; only the
         // deterministic score composition changes.
         .onChange(of: settings.considerDueDates) {
+            Task { await viewModel.refresh() }
+        }
+        // Hiding/showing a list changes which reminders exist for ranking,
+        // so re-run the pass to reflect it immediately.
+        .onChange(of: settings.ignoredLists) {
             Task { await viewModel.refresh() }
         }
     }
