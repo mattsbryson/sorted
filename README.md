@@ -61,8 +61,9 @@ cd macOS && xcodebuild test -scheme RemindSortTests -destination 'platform=macOS
     confirmation prompt), and advances to the next one. Deleted reminders
     land in Reminders.app's own "Recently Deleted" list, same as deleting
     them there directly.
-- **Today** — the top *N* most important reminders that are due today or
-  overdue, in ranked order (*N* is 5 by default, configurable in Settings).
+- **Today** — the top *N* most important reminders overall, in ranked
+  order, regardless of when they're due — a "what should I do next"
+  shortlist (*N* is 5 by default, configurable in Settings).
 - **Upcoming** — all reminders with a future due date, in ranked order.
 - **Someday** — all reminders with no due date at all, in ranked order.
 

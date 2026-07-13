@@ -38,11 +38,13 @@ final class RemindersViewModel {
     /// Debounces EventKit change notifications into one quiet re-rank.
     private var databaseRefreshDebounce: Task<Void, Never>?
 
-    /// Today is capped to the top N most important items (already AI-ranked order,
-    /// minus anything swiped away this session); the limit is user-configurable
-    /// in Settings. Upcoming/Someday remain uncapped.
+    /// Today is simply the top N most important reminders overall, in
+    /// AI-ranked order, minus anything swiped away this session — no due-date
+    /// filter, so it's a "what should I do next" shortlist regardless of when
+    /// things are due. N is user-configurable in Settings. Upcoming/Someday
+    /// remain uncapped and still filter by due date.
     var todayItems: [ReminderItem] {
-        Array(bucket(.today).filter { !skippedTodayIDs.contains($0.id) }.prefix(settings.todayLimit))
+        Array(rankedReminders.filter { !skippedTodayIDs.contains($0.id) }.prefix(settings.todayLimit))
     }
     var upcomingItems: [ReminderItem] { bucket(.upcoming) }
     var somedayItems: [ReminderItem] { bucket(.someday) }
@@ -254,15 +256,12 @@ final class RemindersViewModel {
     }
 
     private enum DueBucket {
-        case today, upcoming, someday
+        case upcoming, someday
     }
 
     private func bucket(_ b: DueBucket) -> [ReminderItem] {
         rankedReminders.filter { item in
             switch b {
-            case .today:
-                guard let due = item.dueDate else { return false }
-                return item.isOverdue || Calendar.current.isDateInToday(due)
             case .upcoming:
                 guard let due = item.dueDate else { return false }
                 return !item.isOverdue && !Calendar.current.isDateInToday(due)

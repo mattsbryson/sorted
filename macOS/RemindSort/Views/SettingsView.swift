@@ -20,7 +20,7 @@ struct SettingsView: View {
                     value: $settings.todayLimit,
                     in: AppSettings.todayLimitRange
                 )
-                Text("The Today tab shows up to this many of your most important due-today or overdue reminders.")
+                Text("The Today tab shows up to this many of your most important reminders overall, regardless of when they're due.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
