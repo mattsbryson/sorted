@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingLogExporter = false
+    @State private var showingFaceOffExporter = false
 
     var body: some View {
         @Bindable var settings = settings
@@ -52,6 +53,19 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Show Face Off tab", isOn: $settings.faceOffEnabled)
+                HStack {
+                    Button("Export Face-Off Log…") {
+                        showingFaceOffExporter = true
+                    }
+                    .disabled(!FaceOffLog.hasLoggedData)
+                }
+                Text("Adds a tab where you pick the more important of two reminders. Each pick is saved on this device as a direct comparison — the cleanest training data for a personalized ranking model.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Spacer()
 
             HStack {
@@ -62,12 +76,18 @@ struct SettingsView: View {
             }
         }
         .padding(24)
-        .frame(width: 360, height: 470)
+        .frame(width: 360, height: 580)
         .fileExporter(
             isPresented: $showingLogExporter,
             document: PreferenceLog.ExportDocument(data: PreferenceLog.exportData()),
             contentType: PreferenceLog.exportType,
             defaultFilename: "RemindSort-preferences"
+        ) { _ in }
+        .fileExporter(
+            isPresented: $showingFaceOffExporter,
+            document: TrainingLog.ExportDocument(data: FaceOffLog.exportData()),
+            contentType: TrainingLog.exportType,
+            defaultFilename: "RemindSort-faceoffs"
         ) { _ in }
         // Re-rank right away so the new order greets the user on close. No
         // model calls happen here — importance stays cached; only the

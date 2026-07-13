@@ -10,6 +10,7 @@ final class AppSettings {
         static let showUrgencyScore = "RemindSort.settings.showUrgencyScore"
         static let considerDueDates = "RemindSort.settings.considerDueDates"
         static let preferenceLogging = "RemindSort.settings.preferenceLogging"
+        static let faceOffEnabled = "RemindSort.settings.faceOffEnabled"
     }
 
     static let todayLimitRange = 1...20
@@ -43,6 +44,14 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(preferenceLogging, forKey: Keys.preferenceLogging) }
     }
 
+    /// When true, a "Face Off" tab appears where the user picks the more
+    /// important of two reminders, logging explicit pairwise training data
+    /// (`FaceOffLog`). Off by default — it's a power-user data-collection
+    /// tab, not part of the everyday flow.
+    var faceOffEnabled: Bool {
+        didSet { UserDefaults.standard.set(faceOffEnabled, forKey: Keys.faceOffEnabled) }
+    }
+
     init() {
         let defaults = UserDefaults.standard
         if let stored = defaults.object(forKey: Keys.todayLimit) as? Int {
@@ -53,5 +62,6 @@ final class AppSettings {
         showUrgencyScore = defaults.bool(forKey: Keys.showUrgencyScore)
         considerDueDates = (defaults.object(forKey: Keys.considerDueDates) as? Bool) ?? true
         preferenceLogging = (defaults.object(forKey: Keys.preferenceLogging) as? Bool) ?? true
+        faceOffEnabled = defaults.bool(forKey: Keys.faceOffEnabled)
     }
 }

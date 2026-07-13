@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(RemindersViewModel.self) private var viewModel
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
         Group {
@@ -54,6 +55,11 @@ struct ContentView: View {
 
             ReminderListView(title: "Someday", items: viewModel.somedayItems, searchable: true)
                 .tabItem { Label("Someday", systemImage: "tray.fill") }
+
+            if settings.faceOffEnabled {
+                FaceOffView()
+                    .tabItem { Label("Face Off", systemImage: "square.on.square") }
+            }
         }
     }
 }

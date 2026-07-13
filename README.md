@@ -41,7 +41,7 @@ cd macOS && xcodebuild test -scheme RemindSortTests -destination 'platform=macOS
 
 ## Features
 
-### Four tabs
+### Tabs
 
 - **Home** — shows a single card for the most important reminder overall,
   determined by AI ranking (see below). A refresh button sits in the top-right
@@ -66,6 +66,13 @@ cd macOS && xcodebuild test -scheme RemindSortTests -destination 'platform=macOS
   shortlist (*N* is 5 by default, configurable in Settings).
 - **Upcoming** — all reminders with a future due date, in ranked order.
 - **Someday** — all reminders with no due date at all, in ranked order.
+
+- **Face Off** — an optional fifth tab (off by default; enable it under
+  Settings) that shows two reminders and asks which is more important. Each
+  pick is logged as explicit pairwise training data (see below). Pairs are
+  drawn biased toward reminders near each other in the current ranking —
+  the comparisons the ranker is least sure about, so the most informative
+  labels — with left/right randomized so position isn't a tell.
 
 Upcoming and Someday have a **search field** (filtering by title, notes, and
 list name) since those lists grow long; Today is already a short curated
@@ -107,8 +114,11 @@ via `UserDefaults`):
   (including any rotated history, in chronological order) via the standard
   save panel (macOS) / Files sheet (iOS) as a `.jsonl` file. The button is
   disabled until at least one event has been logged.
+- **Show Face Off tab** — off by default; adds the Face Off tab described
+  above. **Export Face-Off Log…** next to it exports the pairwise-judgment
+  log the same way, as a separate `.jsonl` file.
 
-All four tabs draw from one shared ranking pass, so Home and the tab buckets
+The list tabs draw from one shared ranking pass, so Home and the buckets
 always agree on relative importance.
 
 ### AI-based priority ranking
@@ -236,24 +246,27 @@ reminder, a recomputed time component, and a plain sort by score at the end.
 verified on-device across repeated launches with unchanged data: zero
 model-generation activity in the logs after the first full pass.)
 
-### Preference logging (training data)
+### Training data (two logs)
 
-Groundwork for the custom-model to-do above: every ranking-feedback action —
-**Complete**, **Skip** (Home), swipe-skip (Today), **Snooze**, **Delete** —
-is appended to an on-device log (`PreferenceLog.swift`) together with the
-ranked context the user was looking at when they did it (top 10: position,
-title, truncated notes, list, due/created day offsets, priority flag,
-score). Each action is an implicit preference judgment — completing the top
-item endorses the ranking, skipping it says something below deserved the
-spot — so the log accumulates exactly the pairwise-preference data a
-learning-to-rank model trains on.
+Groundwork for the custom-model to-do above. Both logs are JSON Lines (one
+event per line) in `Application Support/RemindSort/`, rotated once at 10 MB,
+written best-effort off the main actor, and never leave the device unless
+exported. They share their file machinery and per-reminder feature schema
+(`TrainingLog.swift`); each is exportable as a `.jsonl` file from Settings.
 
-Format is JSON Lines (one event per line) at
-`Application Support/RemindSort/preferences.jsonl`, rotated once at 10 MB.
-Writes are best-effort, off the main actor, and the data never leaves the
-device unless exported. Logging can be turned off in Settings ("Log ranking
-feedback", enforced at a single gate in the view model), and the whole log
-can be exported from Settings as a `.jsonl` file for training work.
+- **Implicit feedback** (`PreferenceLog.swift`, `preferences.jsonl`) — every
+  **Complete**, **Skip** (Home), swipe-skip (Today), **Snooze**, and
+  **Delete**, together with the ranked context the user was looking at (top
+  10: position, title, truncated notes, list, due/created day offsets,
+  priority flag, score). Each action is an *implicit* preference judgment —
+  completing the top item endorses the ranking, skipping it says something
+  below deserved the spot. Can be turned off in Settings ("Log ranking
+  feedback", enforced at a single gate in the view model).
+
+- **Explicit face-offs** (`FaceOffLog.swift`, `faceoffs.jsonl`) — one
+  `{winner, loser}` record per pick in the Face Off tab. This is the
+  cleanest signal of the two: a direct pairwise label with no ranked-order
+  noise to untangle. Written only while the Face Off tab is enabled.
 
 ### Loading screen
 

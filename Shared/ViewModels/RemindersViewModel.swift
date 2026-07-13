@@ -38,6 +38,11 @@ final class RemindersViewModel {
     /// Debounces EventKit change notifications into one quiet re-rank.
     private var databaseRefreshDebounce: Task<Void, Never>?
 
+    /// The two reminders currently shown in the Face Off tab, and how many
+    /// comparisons have been logged this session (for a small progress cue).
+    private(set) var faceOffPair: (ReminderItem, ReminderItem)?
+    private(set) var faceOffCount = 0
+
     /// Today is simply the top N most important reminders overall, in
     /// AI-ranked order, minus anything swiped away this session — no due-date
     /// filter, so it's a "what should I do next" shortlist regardless of when
@@ -131,6 +136,18 @@ final class RemindersViewModel {
         } else if homeIndex >= ranked.count {
             homeIndex = 0
         }
+        refreshFaceOffPairIfStale()
+    }
+
+    /// Regenerates the Face Off pair if either reminder it references has
+    /// left the ranked set (completed/deleted/edited away), so the tab never
+    /// shows a reminder that no longer exists.
+    private func refreshFaceOffPairIfStale() {
+        guard let pair = faceOffPair else { return }
+        let live = Set(rankedReminders.map(\.id))
+        if !live.contains(pair.0.id) || !live.contains(pair.1.id) {
+            faceOffPair = makeFaceOffPair(excluding: pair)
+        }
     }
 
     /// All feedback logging funnels through here so the Settings toggle is
@@ -150,6 +167,58 @@ final class RemindersViewModel {
             context: context,
             snoozeDays: snoozeDays
         )
+    }
+
+    // MARK: Face Off
+
+    /// Ensures a pair is loaded when the tab appears. No-op if one's already
+    /// showing, so switching away and back doesn't discard the current pair.
+    func startFaceOff() {
+        if faceOffPair == nil {
+            faceOffPair = makeFaceOffPair(excluding: nil)
+        }
+    }
+
+    /// Records the user's explicit judgment and advances to a fresh pair.
+    func chooseFaceOff(winner: ReminderItem, loser: ReminderItem) {
+        FaceOffLog.record(winner: winner, loser: loser)
+        faceOffCount += 1
+        faceOffPair = makeFaceOffPair(excluding: faceOffPair)
+    }
+
+    /// Swaps in a new pair without recording a judgment (the two shown were
+    /// too close to call, or the user just wants different ones).
+    func skipFaceOffPair() {
+        faceOffPair = makeFaceOffPair(excluding: faceOffPair)
+    }
+
+    /// Draws two distinct reminders to compare. Biased toward pairs that are
+    /// *near each other in the current ranking* — those are the comparisons
+    /// the ranker is most uncertain about, so they're the most informative
+    /// labels — while still randomized (including left/right order, so
+    /// position isn't a tell) and avoiding an immediate repeat of the last
+    /// pair. Returns nil if there aren't two reminders to compare.
+    private func makeFaceOffPair(excluding previous: (ReminderItem, ReminderItem)?) -> (ReminderItem, ReminderItem)? {
+        let items = rankedReminders
+        guard items.count >= 2 else { return nil }
+        let previousKey = previous.map { Set([$0.0.id, $0.1.id]) }
+        let window = 4
+
+        for _ in 0..<16 {
+            let anchor = Int.random(in: 0..<items.count)
+            let low = max(0, anchor - window)
+            let high = min(items.count - 1, anchor + window)
+            var partner = Int.random(in: low...high)
+            if partner == anchor { partner = anchor < high ? anchor + 1 : anchor - 1 }
+            guard partner != anchor else { continue }
+
+            let a = items[anchor]
+            let b = items[partner]
+            if let previousKey, previousKey == Set([a.id, b.id]) { continue }
+            return Bool.random() ? (a, b) : (b, a)
+        }
+        // Fallback for tiny lists where the loop couldn't find a fresh pair.
+        return (items[0], items[1])
     }
 
     func skipHome() {
@@ -253,6 +322,7 @@ final class RemindersViewModel {
         if homeIndex >= rankedReminders.count {
             homeIndex = 0
         }
+        refreshFaceOffPairIfStale()
     }
 
     private enum DueBucket {
