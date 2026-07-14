@@ -41,14 +41,20 @@ struct SettingsView: View {
                 Text(settings.rankerKind.detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Picker("MLX model", selection: $settings.mlxModel) {
-                    ForEach(MLXModelChoice.allCases, id: \.self) { choice in
-                        Text(choice.displayName).tag(choice)
+                // Which LLM the MLX arm runs — only meaningful when that arm
+                // can actually be exercised (selected as the active strategy,
+                // or comparable via the Ranker Lab), so it's hidden otherwise
+                // rather than reading as a second, parallel model choice.
+                if settings.rankerKind == .mlx || settings.rankerLabEnabled {
+                    Picker("MLX model", selection: $settings.mlxModel) {
+                        ForEach(MLXModelChoice.allCases, id: \.self) { choice in
+                            Text(choice.displayName).tag(choice)
+                        }
                     }
+                    Text(settings.mlxModel.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                Text(settings.mlxModel.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 8) {

@@ -31,15 +31,26 @@ struct SettingsView: View {
                             Text(kind.displayName).tag(kind)
                         }
                     }
-                    Picker("MLX model", selection: $settings.mlxModel) {
-                        ForEach(MLXModelChoice.allCases, id: \.self) { choice in
-                            Text(choice.displayName).tag(choice)
+                    // Which LLM the MLX arm runs — only meaningful when that
+                    // arm can actually be exercised (selected as the active
+                    // strategy, or comparable via the Ranker Lab), so it's
+                    // hidden otherwise rather than reading as a second,
+                    // parallel model choice.
+                    if settings.rankerKind == .mlx || settings.rankerLabEnabled {
+                        Picker("MLX model", selection: $settings.mlxModel) {
+                            ForEach(MLXModelChoice.allCases, id: \.self) { choice in
+                                Text(choice.displayName).tag(choice)
+                            }
                         }
                     }
                 } header: {
                     Text("Experimental")
                 } footer: {
-                    Text(settings.rankerKind.detail + " MLX model: " + settings.mlxModel.detail)
+                    if settings.rankerKind == .mlx || settings.rankerLabEnabled {
+                        Text(settings.rankerKind.detail + " MLX model: " + settings.mlxModel.detail)
+                    } else {
+                        Text(settings.rankerKind.detail)
+                    }
                 }
 
                 Section {
