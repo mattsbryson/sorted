@@ -7,6 +7,7 @@ struct SettingsView: View {
 
     @State private var showingLogExporter = false
     @State private var showingFaceOffExporter = false
+    @State private var rankingInputsAtOpen: RankingInputs?
 
     var body: some View {
         @Bindable var settings = settings
@@ -101,20 +102,29 @@ struct SettingsView: View {
                 contentType: TrainingLog.exportType,
                 defaultFilename: "Sorted-faceoffs"
             ) { _ in }
-            // Re-rank right away so the new order greets the user on close.
-            // No model calls happen here — importance stays cached; only the
-            // deterministic score composition changes.
-            .onChange(of: settings.considerDueDates) {
-                Task { await viewModel.refresh() }
+            // Re-rank once, after Settings closes — never on each toggle.
+            // refresh() flips loadState to .loading, which swaps the tabs
+            // (and this sheet along with them) for the loading screen; doing
+            // that mid-edit dismisses Settings on every change, so you can't
+            // turn off several lists in a row. Snapshot the ranking-affecting
+            // inputs on open and, if they differ on close, re-rank so the new
+            // order greets the user.
+            .onAppear {
+                rankingInputsAtOpen = RankingInputs(
+                    considerDueDates: settings.considerDueDates,
+                    ignoredLists: settings.ignoredLists,
+                    rankerKind: settings.rankerKind
+                )
             }
-            // Switching strategy re-ranks from scratch with the new model.
-            .onChange(of: settings.rankerKind) {
-                Task { await viewModel.refresh() }
-            }
-            // Hiding/showing a list changes which reminders exist for
-            // ranking, so re-run the pass to reflect it immediately.
-            .onChange(of: settings.ignoredLists) {
-                Task { await viewModel.refresh() }
+            .onDisappear {
+                let current = RankingInputs(
+                    considerDueDates: settings.considerDueDates,
+                    ignoredLists: settings.ignoredLists,
+                    rankerKind: settings.rankerKind
+                )
+                if let initial = rankingInputsAtOpen, current != initial {
+                    Task { await viewModel.refresh() }
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -123,4 +133,13 @@ struct SettingsView: View {
             }
         }
     }
+}
+
+/// Snapshot of the settings that affect ranking output, captured when
+/// Settings opens so it can re-rank exactly once on close, and only when one
+/// of these actually changed.
+private struct RankingInputs: Equatable {
+    var considerDueDates: Bool
+    var ignoredLists: Set<String>
+    var rankerKind: RankerKind
 }
