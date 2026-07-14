@@ -22,11 +22,32 @@ struct RankerLabView: View {
     @State private var right: [ReminderItem] = []
     @State private var isRunning = false
 
-    /// b_position - a_position for each id, from the left ordering to the
-    /// right one: negative means the item is higher (nearer the top) on the
-    /// right. Keyed to whichever side is being rendered.
-    private var deltas: [String: Int] {
-        RankingMetrics.rankDeltas(left.map(\.id), right.map(\.id))
+    /// One row per reminder: the item with its position in each strategy's
+    /// ordering. Ordered by each reminder's **best** rank across the two
+    /// strategies (ties by A's rank), so whatever either model puts on top is
+    /// at the top of the page.
+    private struct ComparisonRow: Identifiable {
+        let item: ReminderItem
+        let aRank: Int?
+        let bRank: Int?
+        var id: String { item.id }
+        var bestRank: Int { min(aRank ?? .max, bRank ?? .max) }
+    }
+
+    private var rows: [ComparisonRow] {
+        let aIndex = Dictionary(uniqueKeysWithValues: left.enumerated().map { ($1.id, $0) })
+        let bIndex = Dictionary(uniqueKeysWithValues: right.enumerated().map { ($1.id, $0) })
+        // Both strategies rank the same set, but tolerate divergence: any item
+        // present on either side gets a row, with — for a missing rank.
+        var seen = Set<String>()
+        var all: [ComparisonRow] = []
+        for item in left + right where seen.insert(item.id).inserted {
+            all.append(ComparisonRow(item: item, aRank: aIndex[item.id], bRank: bIndex[item.id]))
+        }
+        return all.sorted { lhs, rhs in
+            if lhs.bestRank != rhs.bestRank { return lhs.bestRank < rhs.bestRank }
+            return (lhs.aRank ?? .max) < (rhs.aRank ?? .max)
+        }
     }
 
     private var tau: Double? {
@@ -157,29 +178,28 @@ struct RankerLabView: View {
             LazyVStack(spacing: 0) {
                 header
                 Divider()
-                // One row per rank position, pairing A's item at that rank
-                // with B's item at the same rank so the eye reads each slot
-                // across; the delta badge on the B side shows how far that
-                // item moved relative to A.
-                ForEach(0..<max(left.count, right.count), id: \.self) { index in
-                    HStack(alignment: .top, spacing: 8) {
-                        cell(item: left[safe: index], rank: index, delta: nil)
-                        cell(item: right[safe: index], rank: index, delta: right[safe: index].flatMap { deltas[$0.id] })
-                    }
-                    .padding(.vertical, 6)
-                    .padding(.horizontal)
-                    if index < max(left.count, right.count) - 1 { Divider() }
+                // One row per reminder, ordered by its best rank across the
+                // two strategies — the top of the page is whatever either
+                // model considers most important. Each row carries the item's
+                // rank under A and under B, plus the movement between them.
+                let rows = self.rows
+                ForEach(rows) { row in
+                    rowView(row)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal)
+                    if row.id != rows.last?.id { Divider() }
                 }
             }
         }
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Text("A · \(leftKind.displayName)")
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("vs")
+                .foregroundStyle(.tertiary)
             Text("B · \(rightKind.displayName)")
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer()
         }
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
@@ -187,34 +207,42 @@ struct RankerLabView: View {
         .padding(.vertical, 6)
     }
 
-    private func cell(item: ReminderItem?, rank: Int, delta: Int?) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            Text("\(rank + 1)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.tertiary)
-                .frame(minWidth: 18, alignment: .trailing)
-            if let item {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.title)
-                        .font(.subheadline)
-                        .lineLimit(2)
-                    Text(item.listName)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 4)
-                if let delta { deltaBadge(delta) }
-            } else {
-                Text("—")
-                    .foregroundStyle(.tertiary)
-                Spacer(minLength: 0)
+    private func rowView(_ row: ComparisonRow) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            rankChip("A", row.aRank)
+            rankChip("B", row.bRank)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.item.title)
+                    .font(.subheadline)
+                    .lineLimit(2)
+                Text(row.item.listName)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+            if let a = row.aRank, let b = row.bRank {
+                deltaBadge(b - a)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Signed rank change badge: green ▲ moved up (toward the top) on side B,
-    /// red ▼ moved down, grey dot unchanged. The number is how many slots.
+    /// The item's 1-based position under one strategy ("—" if it's somehow
+    /// absent from that side's ordering).
+    private func rankChip(_ label: String, _ rank: Int?) -> some View {
+        VStack(spacing: 0) {
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(rank.map { "\($0 + 1)" } ?? "—")
+                .font(.callout.monospacedDigit().weight(.semibold))
+        }
+        .frame(minWidth: 26)
+    }
+
+    /// Signed rank-change badge (B relative to A): green ▲ B ranks it higher
+    /// (nearer the top), red ▼ B ranks it lower, grey = same position. The
+    /// number is how many slots it moved.
     private func deltaBadge(_ delta: Int) -> some View {
         Group {
             if delta == 0 {
@@ -250,11 +278,5 @@ struct RankerLabView: View {
         guard !Task.isCancelled else { return }
         left = a
         right = b
-    }
-}
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
     }
 }
