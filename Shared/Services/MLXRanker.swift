@@ -96,6 +96,19 @@ struct MLXRanker {
     /// land in the first (highest-signal) pass.
     static let batchSize = 40
 
+    /// The batch is sized to the model's judgment capacity, not just its
+    /// context window: the 1B model degrades sharply when asked to hold a
+    /// 40-way comparison, emitting partial orderings whose omitted items
+    /// silently fall back to the heuristic order — a mostly-deterministic
+    /// list wearing the MLX label. A smaller group it can actually judge
+    /// beats a bigger one it can't.
+    static func batchSize(for choice: MLXModelChoice) -> Int {
+        switch choice {
+        case .llama1B: 20
+        case .qwen1_5B, .qwen3B: batchSize
+        }
+    }
+
     /// The hub id of the user's chosen model (Settings → Experimental → MLX
     /// model), read straight from UserDefaults so the nonisolated rank path
     /// never has to hop to the main-actor `AppSettings`.
@@ -155,8 +168,9 @@ struct MLXRanker {
         // Process in big batches. In practice a reminder set is usually one
         // batch; larger sets get successive passes, each already anchored by
         // the deterministic pre-sort.
-        for start in stride(from: 0, to: preSorted.count, by: Self.batchSize) {
-            let chunk = Array(preSorted[start..<min(start + Self.batchSize, preSorted.count)])
+        let batchSize = Self.batchSize(for: MLXModelChoice.current)
+        for start in stride(from: 0, to: preSorted.count, by: batchSize) {
+            let chunk = Array(preSorted[start..<min(start + batchSize, preSorted.count)])
             let orderedIDs = await Self.listwiseOrder(
                 chunk, container: container, includeDates: consideringDueDates, now: now)
             let rebuilt = Self.reorder(chunk, byIDs: orderedIDs)
@@ -376,8 +390,19 @@ extension MLXRanker {
                 instructions: instructions,
                 generateParameters: GenerateParameters(maxTokens: maxTokens, temperature: 0))
             let output = try await session.respond(to: prompt)
-            return parseOrder(output, tokenToID: tokenToID)
+            let ids = parseOrder(output, tokenToID: tokenToID)
+            #if DEBUG
+            // Coverage is the tell when a small model "looks bad": every
+            // omitted token silently keeps its deterministic position, so low
+            // coverage means the displayed order is mostly heuristic, not the
+            // model judging poorly. Watch this in Xcode's console.
+            print("MLXRanker[\(MLXModelChoice.current.rawValue)]: ordered \(ids.count)/\(batch.count) of batch")
+            #endif
+            return ids
         } catch {
+            #if DEBUG
+            print("MLXRanker[\(MLXModelChoice.current.rawValue)]: pass failed — \(error)")
+            #endif
             return []
         }
     }
