@@ -13,6 +13,7 @@
 		12EDAA1201725A9041E59A81 /* RankingMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B93FE36F71B8AED3761FB233 /* RankingMetrics.swift */; };
 		26CDAC4A4CAF7AF32ED4FF9E /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 14C57C606C3531FFBA3AC7B3 /* MLXLMCommon */; };
 		31963A899B17A077EAE8D790 /* FaceOffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7F82E3A6C4F42E4665C9DCE /* FaceOffView.swift */; };
+		3196A2FEB6C7593438B2502B /* TitleEmbedding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081FF256673B51145A4EA5CA /* TitleEmbedding.swift */; };
 		332AF093F2D6DC7A185AA020 /* ImportanceTiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFB9380DCF9BA15A34621A4 /* ImportanceTiers.swift */; };
 		3B96ECA9FF5F01F54F6B2633 /* AIPrioritizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D023B48734733105A51E4E1 /* AIPrioritizer.swift */; };
 		505668E729BC18BCE86CFF95 /* MLXRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD683E9BA69B2A0922F2B384 /* MLXRanker.swift */; };
@@ -44,6 +45,7 @@
 
 /* Begin PBXFileReference section */
 		02755109E25EC05647AEB27F /* CoreMLRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreMLRanker.swift; sourceTree = "<group>"; };
+		081FF256673B51145A4EA5CA /* TitleEmbedding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitleEmbedding.swift; sourceTree = "<group>"; };
 		0B51691D1A86138801DA88CE /* PreferenceLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferenceLog.swift; sourceTree = "<group>"; };
 		0FC2C542B36B7E7417CE0071 /* RankedOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedOrder.swift; sourceTree = "<group>"; };
 		1104A5CAB24B0BCB3D66C940 /* Sorted.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Sorted.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -151,6 +153,7 @@
 				9932E56A3E934086A7C7E075 /* RankerKind.swift */,
 				B93FE36F71B8AED3761FB233 /* RankingMetrics.swift */,
 				78DEFBFC4AD48EDC6443C1D4 /* RemindersService.swift */,
+				081FF256673B51145A4EA5CA /* TitleEmbedding.swift */,
 				C3F978B74F95A8EBFE63EADE /* TopOrderCache.swift */,
 				C56760078EA1686578469FCB /* TrainingLog.swift */,
 				8A43C43EC1F74BD72EFA63ED /* UrgencyScorer.swift */,
@@ -323,6 +326,7 @@
 				E63A34BE4BCA18BC8D5141E7 /* SettingsView.swift in Sources */,
 				D816BC89D9B62C8DF3D629C9 /* SnoozeUnit.swift in Sources */,
 				7DD025B265A0ABC27C5BEFC6 /* SortedApp.swift in Sources */,
+				3196A2FEB6C7593438B2502B /* TitleEmbedding.swift in Sources */,
 				716E607EBE45E03F77F0B21D /* TopOrderCache.swift in Sources */,
 				B32419E3DE0A19ABBAAE408A /* TrainingLog.swift in Sources */,
 				C783EAF169C600656D298ED8 /* UrgencyScorer.swift in Sources */,

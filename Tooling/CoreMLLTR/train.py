@@ -29,7 +29,8 @@ import os
 
 import numpy as np
 
-from data import build_dataset
+from data import load_pairs, pair_matrix, pair_titles
+from embeddings import embed_titles
 from features import FEATURE_COUNT, FEATURE_NAMES
 
 # The app's on-device Application Support directory (macOS). Used as the default
@@ -117,6 +118,10 @@ def main() -> None:
     ap.add_argument("--weak-count", type=int, default=4000,
                     help="Number of weak/synthetic pairs to bootstrap with. "
                          "Set 0 to train only on real data.")
+    ap.add_argument("--holdout", type=float, default=0.2,
+                    help="Fraction of real pairs (newest, by log order) held "
+                         "out to report generalization before the final "
+                         "full-data training. 0 disables.")
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)),
                     help="Output directory for the .mlpackage.")
     args = ap.parse_args()
@@ -124,27 +129,47 @@ def main() -> None:
     faceoffs = args.faceoffs if os.path.exists(args.faceoffs) else None
     preferences = args.preferences if os.path.exists(args.preferences) else None
 
-    X_list, y_list, stats = build_dataset(faceoffs, preferences, args.weak_count)
-    if not X_list:
+    real, weak, counts = load_pairs(faceoffs, preferences, args.weak_count)
+    if not real and not weak:
         print("No training data at all (no real logs and weak_count=0). "
               "Nothing to train. Re-run with --weak-count > 0.")
         raise SystemExit(1)
 
-    X = np.asarray(X_list, dtype=np.float64)
-    y = np.asarray(y_list, dtype=np.float64)
-
     print("Data sources:")
-    print(f"  explicit face-off pairs : {stats['faceoff_pairs']}")
-    print(f"  implicit preference pairs: {stats['preference_pairs']}")
-    print(f"  weak/synthetic pairs     : {stats['weak_pairs']}")
-    print(f"  total training rows      : {stats['training_rows']} "
+    print(f"  explicit face-off pairs : {counts['faceoff_pairs']}")
+    print(f"  implicit preference pairs: {counts['preference_pairs']}")
+    print(f"  weak/synthetic pairs     : {counts['weak_pairs']}")
+
+    print("Embedding titles via Tooling/EmbedTool (the app's own Swift code)…")
+    embeddings = embed_titles(pair_titles(real + weak))
+
+    def matrices(pairs):
+        X, y = pair_matrix(pairs, embeddings)
+        return np.asarray(X, dtype=np.float64), np.asarray(y, dtype=np.float64)
+
+    # Honest generalization check: train on the older real pairs + weak
+    # prior, test on the newest slice the model never saw. Training accuracy
+    # alone flatters memorization.
+    n_test = int(len(real) * args.holdout)
+    if n_test >= 5:
+        Xh, yh = matrices(real[:-n_test] + weak)
+        Xt, yt = matrices(real[-n_test:])
+        held = evaluate(Xt, yt, train_logistic(Xh, yh))
+        print(f"Held-out accuracy ({n_test} newest real pairs): {held:.3f}")
+    elif args.holdout > 0:
+        print("Held-out check skipped: too few real pairs to split.")
+
+    X, y = matrices(real + weak)
+    print(f"  total training rows      : {len(X)} "
           "(each pair contributes a +/- symmetric row)")
 
     w = train_logistic(X, y)
     acc = evaluate(X, y, w)
-    print(f"Pairwise training accuracy : {acc:.3f}")
-    print("Learned weights:")
-    for name, weight in sorted(zip(FEATURE_NAMES, w), key=lambda t: -abs(t[1])):
+    print(f"Pairwise training accuracy : {acc:.3f} (on the training set — "
+          "see held-out above for generalization)")
+    print("Learned weights (top 16 by magnitude):")
+    ranked = sorted(zip(FEATURE_NAMES, w), key=lambda t: -abs(t[1]))
+    for name, weight in ranked[:16]:
         print(f"  {name:>16}: {weight:+.3f}")
 
     path = export_coreml(w, args.out)

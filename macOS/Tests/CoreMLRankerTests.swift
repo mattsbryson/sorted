@@ -33,7 +33,37 @@ final class CoreMLRankerTests: XCTestCase {
     func testFeatureVectorLength() {
         let feats = CoreMLRanker.features(for: item())
         XCTAssertEqual(feats.count, CoreMLRanker.featureCount)
-        XCTAssertEqual(CoreMLRanker.featureCount, 8 + CoreMLRanker.listHashBuckets)
+        XCTAssertEqual(
+            CoreMLRanker.featureCount,
+            8 + CoreMLRanker.listHashBuckets + TitleEmbedding.dimension
+        )
+    }
+
+    // MARK: Title embedding (appended tail of the vector)
+
+    func testTitleEmbeddingIsDeterministicAndNormalized() {
+        let a = TitleEmbedding.vector(for: "Pay the mortgage")
+        let b = TitleEmbedding.vector(for: "Pay the mortgage")
+        XCTAssertEqual(a, b, "same text must embed identically")
+        XCTAssertEqual(a.count, TitleEmbedding.dimension)
+        let norm = a.reduce(0) { $0 + $1 * $1 }.squareRoot()
+        // Unit length when embedding assets are available; all-zeros
+        // fallback (norm 0) is also valid where they aren't.
+        XCTAssertTrue(abs(norm - 1) < 1e-9 || norm == 0)
+    }
+
+    func testEmptyTitleEmbedsToZeros() {
+        let zeros = TitleEmbedding.vector(for: "   ")
+        XCTAssertEqual(zeros, [Double](repeating: 0, count: TitleEmbedding.dimension))
+    }
+
+    func testDifferentTitlesEmbedDifferently() {
+        let a = TitleEmbedding.vector(for: "Pay the mortgage")
+        let b = TitleEmbedding.vector(for: "Buy sponges")
+        // Only meaningful where embedding assets exist (norm > 0).
+        if a.contains(where: { $0 != 0 }) {
+            XCTAssertNotEqual(a, b)
+        }
     }
 
     func testPriorityOneHotIsMutuallyExclusive() {
@@ -77,7 +107,8 @@ final class CoreMLRankerTests: XCTestCase {
 
     func testListBucketOneHotHasSingleSetBit() {
         let feats = CoreMLRanker.features(for: item(list: "Finance"))
-        let buckets = Array(feats.suffix(CoreMLRanker.listHashBuckets))
+        // Buckets occupy [8, 8+listHashBuckets); the title embedding follows.
+        let buckets = Array(feats[8..<(8 + CoreMLRanker.listHashBuckets)])
         XCTAssertEqual(buckets.reduce(0, +), 1, "exactly one list bucket should be set")
     }
 

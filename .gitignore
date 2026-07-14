@@ -9,3 +9,5 @@ Tooling/CoreMLLTR/.venv/
 # The freshly-trained model output; the shipped copy lives in Shared/Resources/
 Tooling/CoreMLLTR/ImportanceRanker.mlpackage/
 Tooling/CoreMLLTR/__pycache__/
+# EmbedTool build products (SPM)
+Tooling/EmbedTool/.build/

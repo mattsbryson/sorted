@@ -35,6 +35,12 @@ import CoreML
 ///   [6] title_words_norm min(wordCount(title), 20) / 20
 ///   [7] notes_len_norm   min(notes.count, 140) / 140
 ///   [8..8+buckets) list identity one-hot over `listHashBuckets` md5 buckets
+///   [16..16+32)    TitleEmbedding vector — the semantic title signal
+///                  (NLEmbedding → seeded 32-dim projection, L2-normalized);
+///                  zeros when embedding assets are unavailable. Added after
+///                  held-out evaluation showed ~half of real face-off pairs
+///                  are same-list + same-priority, invisible to the features
+///                  above.
 /// Output "score" is a scalar raw importance (higher = more important); we
 /// squash it through a sigmoid into the [0,1] importance weight.
 struct CoreMLRanker: Ranker {
@@ -42,8 +48,8 @@ struct CoreMLRanker: Ranker {
 
     /// Number of md5 buckets the list name is hashed into (LIST_HASH_BUCKETS).
     static let listHashBuckets = 8
-    /// Total feature vector length (FEATURE_COUNT = 8 dense + buckets).
-    static let featureCount = 8 + listHashBuckets
+    /// Total feature vector length (FEATURE_COUNT = 8 dense + buckets + embedding).
+    static let featureCount = 8 + listHashBuckets + TitleEmbedding.dimension
 
     /// Name of the bundled model resource (without extension).
     private static let modelResourceName = "ImportanceRanker"
@@ -207,6 +213,11 @@ struct CoreMLRanker: Ranker {
         var buckets = [Double](repeating: 0, count: listHashBuckets)
         buckets[listBucket(item.listName)] = 1
         feats.append(contentsOf: buckets)
+
+        // Semantic title vector — computed by the same TitleEmbedding code
+        // the training pipeline shells out to (Tooling/EmbedTool), so the
+        // two sides can't drift.
+        feats.append(contentsOf: TitleEmbedding.vector(for: title))
 
         return feats
     }

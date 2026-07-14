@@ -38,6 +38,17 @@ Swift side and retraining/rebundling.
 | 6     | `title_words_norm` | `min(word_count(title), 20) / 20`                   |
 | 7     | `notes_len_norm`   | `min(len(notes), 140) / 140`                        |
 | 8..15 | `list_bucket_i`    | one-hot of the list name hashed into 8 md5 buckets  |
+| 16..47| `title_emb_i`      | 32-dim semantic title embedding (see below)          |
+
+**Title embedding (idx 16..47).** Apple's on-device sentence embedding
+(`NLEmbedding`) projected to 32 dims and L2-normalized — the signal that
+distinguishes "pay the mortgage" from "buy sponges" when list and priority
+tie (measured: ~half of real face-off pairs). Parity between training and
+inference is **by construction**: `embeddings.py` never computes a vector —
+it shells out to `Tooling/EmbedTool`, a CLI compiled from the very
+`Shared/Services/TitleEmbedding.swift` the app runs. Training therefore
+needs the Swift toolchain on this Mac (the first run builds the tool).
+Zeros when embedding assets are unavailable, matching the app's fallback.
 
 List identity uses the **hashing trick**: the list name is md5-hashed (first 4
 bytes, big-endian, mod 8) into a fixed bucket, so the app needs no fixed list
@@ -95,6 +106,10 @@ python train.py --faceoffs /path/to/faceoffs.jsonl \
 
 # Real data only, no synthetic:
 python train.py --weak-count 0
+
+# train.py holds out the newest 20% of real pairs and prints held-out
+# accuracy (the number that matters) before the final full-data training;
+# --holdout 0 disables.
 ```
 
 This writes `ImportanceRanker.mlpackage` into this directory. To ship it, copy

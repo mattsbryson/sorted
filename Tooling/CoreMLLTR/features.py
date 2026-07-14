@@ -34,6 +34,11 @@ LIST_HASH_BUCKETS = 8
 
 # Feature vector layout (index -> meaning). Kept as an explicit list so the
 # README, the Core ML input description, and the Swift side all agree.
+# Dimensionality of the semantic title embedding appended to the vector.
+# Computed by TitleEmbedding.swift (via Tooling/EmbedTool at training time);
+# must match TitleEmbedding.dimension.
+EMBED_DIM = 32
+
 FEATURE_NAMES = [
     "priority_high",       # 1 if RFC-5545 priority 1..4
     "priority_medium",     # 1 if priority == 5
@@ -43,7 +48,8 @@ FEATURE_NAMES = [
     "title_len_norm",      # min(len(title), 100) / 100
     "title_words_norm",    # min(word_count(title), 20) / 20
     "notes_len_norm",      # min(len(notes), 140) / 140
-] + [f"list_bucket_{i}" for i in range(LIST_HASH_BUCKETS)]
+] + [f"list_bucket_{i}" for i in range(LIST_HASH_BUCKETS)] \
+  + [f"title_emb_{i}" for i in range(EMBED_DIM)]
 
 FEATURE_COUNT = len(FEATURE_NAMES)
 
@@ -98,8 +104,13 @@ def _word_count(text: str) -> int:
     return len([w for w in text.split() if w])
 
 
-def extract(reminder: Reminder) -> list[float]:
-    """Turn one reminder into its float feature vector (length FEATURE_COUNT)."""
+def extract(reminder: Reminder, title_embedding: Optional[list[float]] = None) -> list[float]:
+    """Turn one reminder into its float feature vector (length FEATURE_COUNT).
+
+    `title_embedding` is the TitleEmbedding vector for `reminder.title`
+    (see embeddings.py); None falls back to zeros, matching the Swift side's
+    behavior when NLEmbedding is unavailable.
+    """
     notes = reminder.notes or ""
     title = reminder.title or ""
 
@@ -113,6 +124,10 @@ def extract(reminder: Reminder) -> list[float]:
     buckets = [0.0] * LIST_HASH_BUCKETS
     buckets[_list_bucket(reminder.list_name)] = 1.0
     feats.extend(buckets)
+
+    embedding = title_embedding if title_embedding is not None else [0.0] * EMBED_DIM
+    assert len(embedding) == EMBED_DIM, len(embedding)
+    feats.extend(embedding)
 
     assert len(feats) == FEATURE_COUNT, (len(feats), FEATURE_COUNT)
     return feats

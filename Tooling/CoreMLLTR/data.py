@@ -139,16 +139,15 @@ def weak_pairs(count: int, seed: int = 0) -> list[tuple[Reminder, Reminder]]:
 
 # --- assembling the training matrix --------------------------------------
 
-def build_dataset(
+def load_pairs(
     faceoffs: Optional[str],
     preferences: Optional[str],
     weak_count: int,
-) -> tuple[list[list[float]], list[int], dict]:
-    """Return (X, y, stats).
+) -> tuple[list[tuple[Reminder, Reminder]], list[tuple[Reminder, Reminder]], dict]:
+    """Return (real_pairs, weak_pairs, counts).
 
-    Each row is (winner_features - loser_features) with label 1, plus the
-    negated row with label 0, so the logistic model learns an antisymmetric
-    scorer. X are feature *differences*; y in {0,1}.
+    Real pairs preserve log order (chronological), which is what makes a
+    time-based holdout split meaningful in train.py.
     """
     real: list[tuple[Reminder, Reminder]] = []
     n_faceoff = 0
@@ -163,24 +162,31 @@ def build_dataset(
         real.extend(pr)
 
     weak = weak_pairs(weak_count) if weak_count > 0 else []
+    counts = {"faceoff_pairs": n_faceoff, "preference_pairs": n_pref, "weak_pairs": len(weak)}
+    return real, weak, counts
 
-    all_pairs = real + weak
+
+def pair_titles(pairs: list[tuple[Reminder, Reminder]]) -> list[str]:
+    return [r.title for pair in pairs for r in pair]
+
+
+def pair_matrix(
+    pairs: list[tuple[Reminder, Reminder]],
+    embeddings: dict[str, list[float]],
+) -> tuple[list[list[float]], list[int]]:
+    """Rows of (winner_features - loser_features) labeled 1, each with its
+    negated label-0 twin, so the logistic model learns an antisymmetric
+    scorer. `embeddings` maps title -> TitleEmbedding vector (embeddings.py).
+    """
     X: list[list[float]] = []
     y: list[int] = []
-    for winner, loser in all_pairs:
-        fw, fl = extract(winner), extract(loser)
+    for winner, loser in pairs:
+        fw = extract(winner, embeddings.get(winner.title))
+        fl = extract(loser, embeddings.get(loser.title))
         diff = [a - b for a, b in zip(fw, fl)]
         X.append(diff)
         y.append(1)
         # Symmetric negative example.
         X.append([-d for d in diff])
         y.append(0)
-
-    stats = {
-        "faceoff_pairs": n_faceoff,
-        "preference_pairs": n_pref,
-        "weak_pairs": len(weak),
-        "total_pairs": len(all_pairs),
-        "training_rows": len(X),
-    }
-    return X, y, stats
+    return X, y
