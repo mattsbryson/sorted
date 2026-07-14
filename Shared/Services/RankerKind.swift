@@ -50,8 +50,7 @@ enum RankerFactory {
             // the heuristic ordering internally when its model isn't bundled.
             return CoreMLRanker()
         case .mlx:
-            // Replaced on branch `ranker-ab/mlx-bigbatch` with the MLX ranker.
-            return AIPrioritizer()
+            return MLXRanker()
         }
     }
 }
