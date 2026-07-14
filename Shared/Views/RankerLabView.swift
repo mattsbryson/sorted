@@ -23,15 +23,15 @@ struct RankerLabView: View {
     @State private var isRunning = false
 
     /// One row per reminder: the item with its position in each strategy's
-    /// ordering. Ordered by each reminder's **best** rank across the two
-    /// strategies (ties by A's rank), so whatever either model puts on top is
-    /// at the top of the page.
+    /// ordering. The page reads top-to-bottom as **strategy A's ranking**
+    /// (most to least important); the B chip and delta badge on each row show
+    /// where B disagrees. A is the reference ordering — set it to the
+    /// baseline and B to the challenger.
     private struct ComparisonRow: Identifiable {
         let item: ReminderItem
         let aRank: Int?
         let bRank: Int?
         var id: String { item.id }
-        var bestRank: Int { min(aRank ?? .max, bRank ?? .max) }
     }
 
     private var rows: [ComparisonRow] {
@@ -44,9 +44,11 @@ struct RankerLabView: View {
         for item in left + right where seen.insert(item.id).inserted {
             all.append(ComparisonRow(item: item, aRank: aIndex[item.id], bRank: bIndex[item.id]))
         }
+        // A's order top to bottom; anything only B ranked sinks to the end,
+        // ordered by B.
         return all.sorted { lhs, rhs in
-            if lhs.bestRank != rhs.bestRank { return lhs.bestRank < rhs.bestRank }
-            return (lhs.aRank ?? .max) < (rhs.aRank ?? .max)
+            if lhs.aRank != rhs.aRank { return (lhs.aRank ?? .max) < (rhs.aRank ?? .max) }
+            return (lhs.bRank ?? .max) < (rhs.bRank ?? .max)
         }
     }
 
@@ -178,10 +180,9 @@ struct RankerLabView: View {
             LazyVStack(spacing: 0) {
                 header
                 Divider()
-                // One row per reminder, ordered by its best rank across the
-                // two strategies — the top of the page is whatever either
-                // model considers most important. Each row carries the item's
-                // rank under A and under B, plus the movement between them.
+                // One row per reminder, in strategy A's order top to bottom
+                // (most to least important). Each row carries the item's rank
+                // under A and under B, plus the movement between them.
                 let rows = self.rows
                 ForEach(rows) { row in
                     rowView(row)
