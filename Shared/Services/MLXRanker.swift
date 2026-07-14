@@ -305,12 +305,15 @@ struct MLXRanker {
     }
 
     /// Builds the per-item importance-classification prompt for a batch —
-    /// the MLX counterpart of `AIPrioritizer.classifyWithModel`'s prompt.
-    /// Content only (title, notes, list), deliberately date-blind: the model
-    /// judges consequence, never deadline pressure. Pure, so it's testable
-    /// without the model.
+    /// the MLX counterpart of `AIPrioritizer.classifyWithModel`'s prompt,
+    /// sharing its tier anchors (`ClassificationExamples`) so the two arms'
+    /// rubrics can't drift. Content only (title, notes, list), deliberately
+    /// date-blind: the model judges consequence, never deadline pressure.
+    /// `calibration` carries the user's own Face Off judgments — passed in,
+    /// not read here, so this stays pure and testable without the log.
     static func buildClassificationPrompt(
-        for batch: [ReminderItem]
+        for batch: [ReminderItem],
+        calibration: String = ""
     ) -> (instructions: String, prompt: String, tokenToID: [String: String]) {
         var tokenToID: [String: String] = [:]
         let lines = batch.enumerated().map { index, item -> String in
@@ -327,10 +330,11 @@ struct MLXRanker {
         separately by the app, so importance here means consequence, not \
         deadline pressure. A trivial errand is still low importance even if \
         marked urgent, and a serious obligation is still critical even with \
-        no deadline mentioned. Respond with one line per reminder in the \
+        no deadline mentioned. \(ClassificationExamples.tierAnchors) \
+        Respond with one line per reminder in the \
         form TOKEN=TIER, where TIER is one of critical, high, normal, low — \
         for example "R0=high" — and nothing else: no commentary, numbering, \
-        or punctuation.
+        or punctuation.\(calibration)
         """
 
         let prompt = "Classify these reminders' importance:\n" + lines.joined(separator: "\n")
@@ -465,9 +469,12 @@ extension MLXRanker {
         guard !items.isEmpty else { return [:] }
         var result: [String: ImportanceTier] = [:]
         let batchSize = Self.batchSize(for: choice)
+        // Read the user's Face Off calibration once per rank, not per chunk.
+        let calibration = ClassificationExamples.userJudgmentsClause()
         for start in stride(from: 0, to: items.count, by: batchSize) {
             let chunk = Array(items[start..<min(start + batchSize, items.count)])
-            let (instructions, prompt, tokenToID) = buildClassificationPrompt(for: chunk)
+            let (instructions, prompt, tokenToID) = buildClassificationPrompt(
+                for: chunk, calibration: calibration)
             do {
                 let session = ChatSession(
                     container,

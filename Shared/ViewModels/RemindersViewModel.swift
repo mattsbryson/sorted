@@ -158,14 +158,16 @@ final class RemindersViewModel {
         refreshFaceOffPairIfStale()
     }
 
-    /// Regenerates the Face Off pair if either reminder it references has
-    /// left the ranked set (completed/deleted/edited away), so the tab never
-    /// shows a reminder that no longer exists.
+    /// Prunes bracket members and regenerates the Face Off pair if any
+    /// reminder involved has left the ranked set (completed/deleted/edited
+    /// away), so the tab never shows a reminder that no longer exists.
     private func refreshFaceOffPairIfStale() {
-        guard let pair = faceOffPair else { return }
         let live = Set(rankedReminders.map(\.id))
+        faceOffRound.removeAll { !live.contains($0.id) }
+        faceOffWinners.removeAll { !live.contains($0.id) }
+        guard let pair = faceOffPair else { return }
         if !live.contains(pair.0.id) || !live.contains(pair.1.id) {
-            faceOffPair = makeFaceOffPair(excluding: pair)
+            faceOffPair = nextFaceOffPair()
         }
     }
 
@@ -190,54 +192,106 @@ final class RemindersViewModel {
 
     // MARK: Face Off
 
+    /// Face Off runs as a **single-elimination bracket** over a sampled pool
+    /// of reminders: round-one pairs are random, but winners advance to face
+    /// other winners, so successive comparisons are between increasingly
+    /// important reminders — the highest-signal training labels, near the top
+    /// of the importance scale where ranking accuracy matters most. When a
+    /// bracket resolves, a fresh pool is sampled and a new bracket begins.
+    ///
+    /// A pair is **never asked twice**: everything already compared — in the
+    /// on-device log (imported history included) or skipped this session — is
+    /// excluded from pairing. Left/right order is randomized so position
+    /// isn't a tell.
+
+    /// Sampled pool size per bracket: 16 → at most 15 comparisons to a
+    /// champion, a comfortable single sitting.
+    private static let faceOffBracketSize = 16
+
+    /// Reminders awaiting a comparison in the current round, and winners
+    /// promoted to the next round.
+    private var faceOffRound: [ReminderItem] = []
+    private var faceOffWinners: [ReminderItem] = []
+    /// Every pair already asked: seeded from the log at bracket seed time,
+    /// grown by this session's picks and skips.
+    private var faceOffComparedPairs: Set<String> = []
+
     /// Ensures a pair is loaded when the tab appears. No-op if one's already
     /// showing, so switching away and back doesn't discard the current pair.
     func startFaceOff() {
         if faceOffPair == nil {
-            faceOffPair = makeFaceOffPair(excluding: nil)
+            faceOffPair = nextFaceOffPair()
         }
     }
 
-    /// Records the user's explicit judgment and advances to a fresh pair.
+    /// Records the user's explicit judgment, advances the winner in the
+    /// bracket, and shows the next pair.
     func chooseFaceOff(winner: ReminderItem, loser: ReminderItem) {
         FaceOffLog.record(winner: winner, loser: loser)
+        faceOffComparedPairs.insert(FaceOffLog.pairKey(winner.id, loser.id))
         faceOffCount += 1
-        faceOffPair = makeFaceOffPair(excluding: faceOffPair)
+        faceOffWinners.append(winner)
+        faceOffPair = nextFaceOffPair()
     }
 
     /// Swaps in a new pair without recording a judgment (the two shown were
-    /// too close to call, or the user just wants different ones).
+    /// too close to call). Neither advances; the pair won't be asked again
+    /// this session.
     func skipFaceOffPair() {
-        faceOffPair = makeFaceOffPair(excluding: faceOffPair)
+        if let pair = faceOffPair {
+            faceOffComparedPairs.insert(FaceOffLog.pairKey(pair.0.id, pair.1.id))
+        }
+        faceOffPair = nextFaceOffPair()
     }
 
-    /// Draws two distinct reminders to compare. Biased toward pairs that are
-    /// *near each other in the current ranking* — those are the comparisons
-    /// the ranker is most uncertain about, so they're the most informative
-    /// labels — while still randomized (including left/right order, so
-    /// position isn't a tell) and avoiding an immediate repeat of the last
-    /// pair. Returns nil if there aren't two reminders to compare.
-    private func makeFaceOffPair(excluding previous: (ReminderItem, ReminderItem)?) -> (ReminderItem, ReminderItem)? {
-        let items = rankedReminders
-        guard items.count >= 2 else { return nil }
-        let previousKey = previous.map { Set([$0.0.id, $0.1.id]) }
-        let window = 4
+    /// Draws the next uncompared pair: from the current round; else by
+    /// promoting winners into a new round; else by seeding a fresh bracket.
+    /// Returns nil only when there's nothing left to compare (fewer than two
+    /// reminders, or every pair in two fresh samples was already judged).
+    private func nextFaceOffPair() -> (ReminderItem, ReminderItem)? {
+        guard rankedReminders.count >= 2 else { return nil }
 
-        for _ in 0..<16 {
-            let anchor = Int.random(in: 0..<items.count)
-            let low = max(0, anchor - window)
-            let high = min(items.count - 1, anchor + window)
-            var partner = Int.random(in: low...high)
-            if partner == anchor { partner = anchor < high ? anchor + 1 : anchor - 1 }
-            guard partner != anchor else { continue }
-
-            let a = items[anchor]
-            let b = items[partner]
-            if let previousKey, previousKey == Set([a.id, b.id]) { continue }
-            return Bool.random() ? (a, b) : (b, a)
+        for _ in 0..<3 {
+            if let pair = drawFaceOffPair() { return pair }
+            // Round exhausted: winners (plus any odd leftover, which advances
+            // by bye) become the next round.
+            let promoted = faceOffWinners + faceOffRound
+            faceOffWinners = []
+            if promoted.count >= 2 {
+                faceOffRound = promoted.shuffled()
+                if let pair = drawFaceOffPair() { return pair }
+            }
+            // Bracket resolved (or ran dry): sample a fresh pool.
+            seedFaceOffBracket()
         }
-        // Fallback for tiny lists where the loop couldn't find a fresh pair.
-        return (items[0], items[1])
+        return nil
+    }
+
+    /// Takes the next reminder in the round and pairs it with the first
+    /// round-mate it hasn't already faced. A reminder that has faced everyone
+    /// left advances without a fresh comparison.
+    private func drawFaceOffPair() -> (ReminderItem, ReminderItem)? {
+        while faceOffRound.count >= 2 {
+            let a = faceOffRound.removeFirst()
+            if let index = faceOffRound.firstIndex(where: { candidate in
+                !faceOffComparedPairs.contains(FaceOffLog.pairKey(a.id, candidate.id))
+            }) {
+                let b = faceOffRound.remove(at: index)
+                return Bool.random() ? (a, b) : (b, a)
+            }
+            faceOffWinners.append(a)
+        }
+        return nil
+    }
+
+    /// Samples a fresh pool across the whole ranking and reloads the asked-
+    /// pair history from the log (so freshly imported judgments are honored).
+    /// The log read is synchronous but bounded (`TrainingLog.maxFileBytes`)
+    /// and happens once per bracket, not per pair.
+    private func seedFaceOffBracket() {
+        faceOffComparedPairs.formUnion(FaceOffLog.comparedPairKeys())
+        faceOffRound = Array(rankedReminders.shuffled().prefix(Self.faceOffBracketSize))
+        faceOffWinners = []
     }
 
     // MARK: Ranker Lab

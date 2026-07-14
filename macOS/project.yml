@@ -96,6 +96,11 @@ targets:
       - path: ../Shared/Services/ImportanceCache.swift
       - path: ../Shared/Services/TopOrderCache.swift
       - path: ../Shared/Models/RankedOrder.swift
+      # Classification few-shot content and the Face Off log it reads
+      # (AIPrioritizer's and MLXRanker's prompts now include both).
+      - path: ../Shared/Services/ClassificationExamples.swift
+      - path: ../Shared/Services/FaceOffLog.swift
+      - path: ../Shared/Services/TrainingLog.swift
       # MLXRanker's prompt/parse logic is pure (Foundation only); the MLX
       # inference paths are behind `#if canImport(MLXLLM)` so this compiles into
       # the test bundle without linking MLX. Lets us unit-test prompt

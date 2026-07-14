@@ -7,6 +7,7 @@ struct SettingsView: View {
 
     @State private var showingLogExporter = false
     @State private var showingFaceOffExporter = false
+    @State private var showingFaceOffImporter = false
     @State private var rankingInputsAtOpen: RankingInputs?
 
     var body: some View {
@@ -84,8 +85,11 @@ struct SettingsView: View {
                         showingFaceOffExporter = true
                     }
                     .disabled(!FaceOffLog.hasLoggedData)
+                    Button("Import Face-Off Log…") {
+                        showingFaceOffImporter = true
+                    }
                 }
-                Text("Adds a tab where you pick the more important of two reminders. Each pick is saved on this device as a direct comparison — the cleanest training data for a personalized ranking model.")
+                Text("Adds a tab where you pick the more important of two reminders. Each pick is saved on this device as a direct comparison — the cleanest training data for a personalized ranking model. Import merges a log exported from another device.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -136,6 +140,20 @@ struct SettingsView: View {
             contentType: TrainingLog.exportType,
             defaultFilename: "Sorted-faceoffs"
         ) { _ in }
+        // Merges a log exported from another device (e.g. the iPhone's
+        // face-offs) into this device's log, so prompt personalization and
+        // future training see the combined history.
+        .fileImporter(
+            isPresented: $showingFaceOffImporter,
+            allowedContentTypes: [TrainingLog.exportType, .plainText]
+        ) { result in
+            guard case .success(let url) = result else { return }
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            if let data = try? Data(contentsOf: url) {
+                FaceOffLog.importData(data)
+            }
+        }
         // Re-rank once, after Settings closes — never on each toggle.
         // refresh() flips loadState to .loading, which swaps the tabs (and
         // this sheet along with them) for the loading screen; doing that

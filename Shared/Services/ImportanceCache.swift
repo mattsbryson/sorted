@@ -19,8 +19,16 @@ enum ImportanceCache {
         namespace.map { "\(key).\($0)" } ?? key
     }
 
+    /// Bump when the classification prompt changes meaningfully (rubric,
+    /// anchors) so every reminder is re-judged once under the new prompt —
+    /// otherwise old-prompt judgments live on until content edits evict them.
+    /// The ongoing drift of user-judgment calibration examples is deliberately
+    /// NOT versioned: including it would evict the whole cache on every Face
+    /// Off pick.
+    private static let promptVersion = "v2"
+
     static func contentHash(for item: ReminderItem) -> String {
-        let joined = [item.id, item.title, item.notes ?? "", item.listName]
+        let joined = [Self.promptVersion, item.id, item.title, item.notes ?? "", item.listName]
             .joined(separator: "\u{1}")
         let digest = SHA256.hash(data: Data(joined.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()

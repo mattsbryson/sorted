@@ -295,6 +295,9 @@ struct AIPrioritizer: Sendable {
             formatLine(token: "R\(index)", item: item)
         }
 
+        // Anchors pin the rubric's scale; the user's own recent Face Off
+        // picks personalize it (see ClassificationExamples). Both are small
+        // relative to the ~4096-token context shared with the batch lines.
         let session = LanguageModelSession(
             instructions: """
             You judge the real-world importance of a person's reminders \
@@ -304,8 +307,10 @@ struct AIPrioritizer: Sendable {
             are handled separately by the app, so importance here means \
             consequence, not deadline pressure. A trivial errand is still \
             low importance even if marked urgent, and a serious obligation \
-            is still critical even with no deadline mentioned. Respond only \
-            with the requested classifications.
+            is still critical even with no deadline mentioned. \
+            \(ClassificationExamples.tierAnchors) Respond only \
+            with the requested classifications.\
+            \(ClassificationExamples.userJudgmentsClause())
             """
         )
 
