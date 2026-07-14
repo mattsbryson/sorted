@@ -82,6 +82,14 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(rankerKind.rawValue, forKey: Keys.rankerKind) }
     }
 
+    /// Which open LLM the MLX big-batch strategy runs. Persisted under
+    /// `MLXModelChoice.defaultsKey` (not a `Keys` entry) because the
+    /// nonisolated MLX rank path reads that same UserDefaults key directly —
+    /// one source of truth, no actor hop at rank time.
+    var mlxModel: MLXModelChoice {
+        didSet { UserDefaults.standard.set(mlxModel.rawValue, forKey: MLXModelChoice.defaultsKey) }
+    }
+
     func isListIgnored(_ list: String) -> Bool { ignoredLists.contains(list) }
 
     func setList(_ list: String, ignored: Bool) {
@@ -106,5 +114,6 @@ final class AppSettings {
         rankerLabEnabled = defaults.bool(forKey: Keys.rankerLabEnabled)
         ignoredLists = Set(defaults.stringArray(forKey: Keys.ignoredLists) ?? [])
         rankerKind = defaults.string(forKey: Keys.rankerKind).flatMap(RankerKind.init) ?? .apple
+        mlxModel = MLXModelChoice.current
     }
 }

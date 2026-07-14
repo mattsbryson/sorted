@@ -30,10 +30,15 @@ struct SettingsView: View {
                             Text(kind.displayName).tag(kind)
                         }
                     }
+                    Picker("MLX model", selection: $settings.mlxModel) {
+                        ForEach(MLXModelChoice.allCases, id: \.self) { choice in
+                            Text(choice.displayName).tag(choice)
+                        }
+                    }
                 } header: {
                     Text("Experimental")
                 } footer: {
-                    Text(settings.rankerKind.detail)
+                    Text(settings.rankerKind.detail + " MLX model: " + settings.mlxModel.detail)
                 }
 
                 Section {
@@ -113,14 +118,16 @@ struct SettingsView: View {
                 rankingInputsAtOpen = RankingInputs(
                     considerDueDates: settings.considerDueDates,
                     ignoredLists: settings.ignoredLists,
-                    rankerKind: settings.rankerKind
+                    rankerKind: settings.rankerKind,
+                    mlxModel: settings.mlxModel
                 )
             }
             .onDisappear {
                 let current = RankingInputs(
                     considerDueDates: settings.considerDueDates,
                     ignoredLists: settings.ignoredLists,
-                    rankerKind: settings.rankerKind
+                    rankerKind: settings.rankerKind,
+                    mlxModel: settings.mlxModel
                 )
                 if let initial = rankingInputsAtOpen, current != initial {
                     Task { await viewModel.refresh() }
@@ -142,4 +149,5 @@ private struct RankingInputs: Equatable {
     var considerDueDates: Bool
     var ignoredLists: Set<String>
     var rankerKind: RankerKind
+    var mlxModel: MLXModelChoice
 }

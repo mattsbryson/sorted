@@ -16,6 +16,55 @@ import Metal
 #endif
 #endif
 
+/// The user's choice of which open LLM the MLX big-batch ranker runs
+/// (Settings → Experimental → MLX model). Curated hub ids only — 4-bit
+/// quantized instruct models known to work with MLX Swift on-device.
+/// Persisted straight to UserDefaults (see `defaultsKey`) so both the
+/// main-actor `AppSettings` and the nonisolated rank path read one source
+/// of truth without actor hops. Switching models re-downloads on first use
+/// (each is a one-time few-hundred-MB to ~2GB fetch, cached by the hub
+/// loader).
+enum MLXModelChoice: String, CaseIterable, Sendable {
+    case qwen1_5B
+    case llama1B
+    case qwen3B
+
+    static let defaultsKey = "Sorted.settings.mlxModel"
+
+    /// The persisted choice, defaulting to the balanced Qwen 1.5B.
+    static var current: MLXModelChoice {
+        UserDefaults.standard.string(forKey: defaultsKey)
+            .flatMap(MLXModelChoice.init) ?? .qwen1_5B
+    }
+
+    var hubID: String {
+        switch self {
+        case .qwen1_5B: "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
+        case .llama1B: "mlx-community/Llama-3.2-1B-Instruct-4bit"
+        case .qwen3B: "mlx-community/Qwen2.5-3B-Instruct-4bit"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .qwen1_5B: "Qwen 2.5 1.5B (balanced)"
+        case .llama1B: "Llama 3.2 1B (fastest)"
+        case .qwen3B: "Qwen 2.5 3B (best, most memory)"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .qwen1_5B:
+            "Good ranking quality at a size comfortable on modern Apple-Silicon Macs and phones. ~1GB download."
+        case .llama1B:
+            "Smallest and fastest, lowest memory use; noticeably weaker comparative judgment. ~700MB download."
+        case .qwen3B:
+            "Strongest comparative ranking, but ~2GB and slower — best on a Mac or high-end device."
+        }
+    }
+}
+
 /// Option 2 of the ranking A/B: a bigger-context on-device open LLM run via
 /// MLX Swift, so a **single large comparative pass** (default 40 reminders)
 /// judges the whole group side by side. This restores the signal Matt found
@@ -47,12 +96,10 @@ struct MLXRanker {
     /// land in the first (highest-signal) pass.
     static let batchSize = 40
 
-    /// Small quantized instruct model pulled from the Hugging Face hub on first
-    /// use. ~1.5B params at 4-bit is a few hundred MB and runs comfortably on
-    /// modern Apple-Silicon phones/Macs while giving far more headroom than the
-    /// baseline. Swappable for `mlx-community/Llama-3.2-1B-Instruct-4bit` if a
-    /// smaller footprint is wanted.
-    static let modelID = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
+    /// The hub id of the user's chosen model (Settings → Experimental → MLX
+    /// model), read straight from UserDefaults so the nonisolated rank path
+    /// never has to hop to the main-actor `AppSettings`.
+    static var modelID: String { MLXModelChoice.current.hubID }
 
     /// Deterministic generation (temperature 0) so the same reminder set yields
     /// the same ordering call to call — the `Ranker` contract asks for a pure,
@@ -73,7 +120,7 @@ struct MLXRanker {
         if let message = ModelStore.shared.lastUnavailableMessage {
             return .unavailable(message)
         }
-        if ModelStore.shared.isLoaded {
+        if ModelStore.shared.loadedHubID == Self.modelID {
             return .available
         }
         // Not yet loaded: the first rank kicks off the one-time download/load
@@ -345,10 +392,12 @@ actor ModelStore {
     private var loadedContainer: ModelContainer?
     private var loadTask: Task<ModelContainer?, Never>?
 
-    /// Best-effort flag for availability reporting from a synchronous context.
-    /// nonisolated(unsafe) is acceptable: it's a plain read for a UI hint, and a
-    /// stale value only affects an advisory message, never correctness.
-    nonisolated(unsafe) private(set) var isLoaded = false
+    /// Best-effort state for availability reporting from a synchronous
+    /// context. nonisolated(unsafe) is acceptable: they're plain reads for a
+    /// UI hint, and a stale value only affects an advisory message, never
+    /// correctness. `loadedHubID` (not a bool) so switching the model in
+    /// Settings correctly reads as "not ready yet" until the new one loads.
+    nonisolated(unsafe) private(set) var loadedHubID: String?
     nonisolated(unsafe) private(set) var lastUnavailableMessage: String?
 
     /// Returns the loaded container if it's ready, **without ever waiting for
@@ -359,18 +408,21 @@ actor ModelStore {
     /// screen; blocking that on a first-use ~1GB Hugging Face download (no
     /// timeout, no progress) hung the whole app.
     func container() async -> ModelContainer? {
-        if let loadedContainer { return loadedContainer }
+        let requestedID = MLXRanker.modelID
+        if let loadedContainer, loadedHubID == requestedID { return loadedContainer }
+        // One load at a time; if the user switched models while a load is in
+        // flight, the mismatch is noticed on the next rank once it finishes.
         if loadTask == nil {
-            loadTask = Task<ModelContainer?, Never> { [modelID = MLXRanker.modelID] in
+            loadTask = Task<ModelContainer?, Never> {
                 do {
                     // Give MLX a modest GPU cache budget; harmless if unsupported.
                     MLX.GPU.set(cacheLimit: 256 * 1024 * 1024)
-                    let container = try await loadModelContainer(id: modelID)
-                    await self.finishLoad(container)
+                    let container = try await loadModelContainer(id: requestedID)
+                    await self.finishLoad(container, hubID: requestedID)
                     return container
                 } catch {
                     self.recordLoadFailure(error)
-                    await self.finishLoad(nil)
+                    await self.finishLoad(nil, hubID: requestedID)
                     return nil
                 }
             }
@@ -378,10 +430,11 @@ actor ModelStore {
         return nil
     }
 
-    private func finishLoad(_ container: ModelContainer?) {
+    private func finishLoad(_ container: ModelContainer?, hubID: String) {
         if let container {
+            // Replaces any previously loaded model (ARC frees the old one).
             loadedContainer = container
-            isLoaded = true
+            loadedHubID = hubID
             lastUnavailableMessage = nil
         }
         loadTask = nil

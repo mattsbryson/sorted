@@ -40,6 +40,14 @@ struct SettingsView: View {
                 Text(settings.rankerKind.detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Picker("MLX model", selection: $settings.mlxModel) {
+                    ForEach(MLXModelChoice.allCases, id: \.self) { choice in
+                        Text(choice.displayName).tag(choice)
+                    }
+                }
+                Text(settings.mlxModel.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -139,14 +147,16 @@ struct SettingsView: View {
             rankingInputsAtOpen = RankingInputs(
                 considerDueDates: settings.considerDueDates,
                 ignoredLists: settings.ignoredLists,
-                rankerKind: settings.rankerKind
+                rankerKind: settings.rankerKind,
+                mlxModel: settings.mlxModel
             )
         }
         .onDisappear {
             let current = RankingInputs(
                 considerDueDates: settings.considerDueDates,
                 ignoredLists: settings.ignoredLists,
-                rankerKind: settings.rankerKind
+                rankerKind: settings.rankerKind,
+                mlxModel: settings.mlxModel
             )
             if let initial = rankingInputsAtOpen, current != initial {
                 Task { await viewModel.refresh() }
@@ -162,4 +172,5 @@ private struct RankingInputs: Equatable {
     var considerDueDates: Bool
     var ignoredLists: Set<String>
     var rankerKind: RankerKind
+    var mlxModel: MLXModelChoice
 }
