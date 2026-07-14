@@ -11,6 +11,14 @@ import Foundation
 enum ImportanceCache {
     private static let key = "Sorted.importanceCache"
 
+    /// Different models' judgments live in different namespaces (nil = the
+    /// Apple baseline's original store): a tier Llama assigned must never be
+    /// served as if Qwen or Apple had judged it, and switching models in
+    /// Settings shouldn't wipe another model's warm cache.
+    private static func storageKey(_ namespace: String?) -> String {
+        namespace.map { "\(key).\($0)" } ?? key
+    }
+
     static func contentHash(for item: ReminderItem) -> String {
         let joined = [item.id, item.title, item.notes ?? "", item.listName]
             .joined(separator: "\u{1}")
@@ -20,8 +28,8 @@ enum ImportanceCache {
 
     /// Returns item.id -> importance for every item whose content hash is
     /// found in the cache. Items not present need a fresh classification.
-    static func cachedTiers(for items: [ReminderItem]) -> [String: ImportanceTier] {
-        let stored = (UserDefaults.standard.dictionary(forKey: key) as? [String: String]) ?? [:]
+    static func cachedTiers(for items: [ReminderItem], namespace: String? = nil) -> [String: ImportanceTier] {
+        let stored = (UserDefaults.standard.dictionary(forKey: storageKey(namespace)) as? [String: String]) ?? [:]
         var result: [String: ImportanceTier] = [:]
         result.reserveCapacity(items.count)
         for item in items {
@@ -37,7 +45,7 @@ enum ImportanceCache {
     /// pass only genuinely AI-derived tiers: fallback tiers are never saved,
     /// so an item the model failed on gets retried next refresh instead of
     /// freezing its fallback forever.
-    static func save(items: [ReminderItem], tiers: [String: ImportanceTier]) {
+    static func save(items: [ReminderItem], tiers: [String: ImportanceTier], namespace: String? = nil) {
         var stored: [String: String] = [:]
         stored.reserveCapacity(items.count)
         for item in items {
@@ -45,6 +53,6 @@ enum ImportanceCache {
                 stored[contentHash(for: item)] = tier.rawValue
             }
         }
-        UserDefaults.standard.set(stored, forKey: key)
+        UserDefaults.standard.set(stored, forKey: storageKey(namespace))
     }
 }

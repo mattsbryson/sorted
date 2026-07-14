@@ -30,6 +30,58 @@ final class MLXRankerTests: XCTestCase {
         )
     }
 
+    // MARK: buildClassificationPrompt / parseTiers (per-item importance)
+
+    func testClassificationPromptIsDateBlindAndTokenized() {
+        let items = [item(id: "a", due: -3, created: 10), item(id: "b")]
+        let (instructions, prompt, tokenToID) = MLXRanker.buildClassificationPrompt(for: items)
+
+        XCTAssertEqual(tokenToID["R0"], "a")
+        XCTAssertEqual(tokenToID["R1"], "b")
+        // Importance is judged from content alone — dates must never appear.
+        XCTAssertFalse(prompt.contains("due="))
+        XCTAssertFalse(prompt.contains("created="))
+        XCTAssertTrue(instructions.contains("TOKEN=TIER"))
+    }
+
+    func testParseTiersReadsCleanOutput() {
+        let tiers = MLXRanker.parseTiers(
+            "R0=high\nR1=low\nR2=critical",
+            tokenToID: ["R0": "a", "R1": "b", "R2": "c"])
+        XCTAssertEqual(tiers["a"], .high)
+        XCTAssertEqual(tiers["b"], .low)
+        XCTAssertEqual(tiers["c"], .critical)
+    }
+
+    func testParseTiersToleratesCommentarySeparatorsAndCase() {
+        let output = """
+        Sure! Here are the classifications:
+        R0: HIGH
+        R1 - normal
+        R12 = Low
+        """
+        let tiers = MLXRanker.parseTiers(
+            output, tokenToID: ["R0": "a", "R1": "b", "R12": "c"])
+        XCTAssertEqual(tiers["a"], .high)
+        XCTAssertEqual(tiers["b"], .normal)
+        XCTAssertEqual(tiers["c"], .low)
+    }
+
+    func testParseTiersDropsUnknownTokensAndKeepsFirstJudgment() {
+        let tiers = MLXRanker.parseTiers(
+            "R0=high R9=critical R0=low",
+            tokenToID: ["R0": "a"])
+        XCTAssertEqual(tiers, ["a": .high])
+    }
+
+    func testParseTiersIgnoresProseThatMentionsTokensWithoutAssignment() {
+        // "R0 and R1 are critical" has words between token and tier — no match.
+        let tiers = MLXRanker.parseTiers(
+            "R0 and R1 are critical",
+            tokenToID: ["R0": "a", "R1": "b"])
+        XCTAssertTrue(tiers.isEmpty)
+    }
+
     // MARK: buildPrompt
 
     func testBuildPromptTokenizesEveryItemAndMapsToIDs() {

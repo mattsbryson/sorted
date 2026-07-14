@@ -45,6 +45,11 @@ enum MLXModelChoice: String, CaseIterable, Sendable {
         }
     }
 
+    /// `ImportanceCache` namespace for this model's judgments — one model's
+    /// tiers must never be served as another's, and switching models in
+    /// Settings shouldn't discard a different model's warm cache.
+    var cacheNamespace: String { "mlx.\(rawValue)" }
+
     var displayName: String {
         switch self {
         case .qwen1_5B: "Qwen 2.5 1.5B (balanced)"
@@ -65,20 +70,22 @@ enum MLXModelChoice: String, CaseIterable, Sendable {
     }
 }
 
-/// Option 2 of the ranking A/B: a bigger-context on-device open LLM run via
-/// MLX Swift, so a **single large comparative pass** (default 40 reminders)
-/// judges the whole group side by side. This restores the signal Matt found
-/// best — the app ranked most usefully when the model weighed a big batch
-/// together — which Apple's ~4096-token FoundationModels context forced away
-/// (see `AIPrioritizer.batchSize = 15`).
+/// Option 2 of the ranking A/B: an on-device open LLM run via MLX Swift,
+/// used with **exactly `AIPrioritizer`'s two-axis architecture** — per-item
+/// importance classification (date-blind, cached per model) + deterministic
+/// time urgency (`UrgencyScorer`) + one listwise re-rank of the top slice.
 ///
-/// Design mirrors `AIPrioritizer.listwiseOrder`: reminders are labelled with
-/// short tokens `R0..Rn`, due/creation dates are **pre-computed in Swift** to
-/// relative offsets (small models are unreliable at date math, so we never ask
-/// the model to do it), and the model is asked to emit every token exactly
-/// once, most-important-first. The reply is parsed back to ids; anything
-/// omitted or duplicated falls back to the deterministic `UrgencyScorer` order
-/// for the remainder, exactly as `AIPrioritizer.reorderTop` rebuilds.
+/// This arm originally ranked with a single large comparative pass (~40
+/// reminders judged together). A/B testing showed Apple's per-item structure
+/// beating pure listwise across every MLX model, so the arm now varies only
+/// the *model*, not the design: the interesting question left is whether a
+/// bigger open model classifies importance better than Apple's ~3B.
+///
+/// Prompt conventions mirror the baseline: reminders are labelled with short
+/// tokens `R0..Rn`, due/creation dates are **pre-computed in Swift** to
+/// relative offsets (small models are unreliable at date math, so we never
+/// ask the model to do it), and free-text replies are parsed defensively —
+/// anything omitted keeps its fallback/deterministic position.
 ///
 /// The loaded model lives in static storage (`ModelStore`) so the fresh
 /// instance the factory builds per rank reuses the one download/load.
@@ -89,11 +96,9 @@ enum MLXModelChoice: String, CaseIterable, Sendable {
 /// the protocol conformance and `availability`/`rank` glue, leaving every pure
 /// static function under test intact.
 struct MLXRanker {
-    /// Big comparative batch. The whole point of this arm: judge a large group
-    /// together rather than the 15-item chunks the Apple context forced.
-    /// Batches larger than this are ranked in successive passes, each pass
-    /// re-anchored by the deterministic pre-sort so the most important items
-    /// land in the first (highest-signal) pass.
+    /// Classification chunk size: how many reminders go into one per-item
+    /// importance prompt. Larger than the Apple arm's 15 because the open
+    /// models aren't bound by the ~4096-token FoundationModels context.
     static let batchSize = 40
 
     /// The batch is sized to the model's judgment capacity, not just its
@@ -108,6 +113,10 @@ struct MLXRanker {
         case .qwen1_5B, .qwen3B: batchSize
         }
     }
+
+    /// How many of the top-ranked reminders get the listwise re-rank pass —
+    /// same slice as `AIPrioritizer.reorderCount`.
+    static let reorderCount = 15
 
     /// The hub id of the user's chosen model (Settings → Experimental → MLX
     /// model), read straight from UserDefaults so the nonisolated rank path
@@ -147,58 +156,67 @@ struct MLXRanker {
         #endif
     }
 
-    /// Ranks all items most- to least-important. Deterministically pre-sorts
-    /// with `UrgencyScorer` (so the first big-batch pass gets the highest-stakes
-    /// items and so we have a fallback order), then runs the MLX comparative
-    /// pass over the leading batch(es). Falls back cleanly to the deterministic
-    /// order whenever MLX is unavailable or a pass fails/omits items.
+    /// Ranks all items most- to least-important, mirroring `AIPrioritizer`'s
+    /// two-axis architecture — which won the A/B against this arm's original
+    /// single listwise big-batch pass (Apple's structure beat pure listwise
+    /// even with bigger models, so the MLX arm now varies only the model,
+    /// not the design):
+    ///
+    /// - **Importance**: the MLX model classifies each reminder into an
+    ///   `ImportanceTier` from content alone — batched prompts, date-blind —
+    ///   cached per reminder *per model* (`ImportanceCache` namespace) until
+    ///   its content changes.
+    /// - **Time urgency**: `UrgencyScorer` computes it deterministically from
+    ///   the dates at rank time and combines the axes.
+    /// - **Top re-rank**: one listwise pass over the top `reorderCount`
+    ///   candidates restores comparative fine ordering, exactly like
+    ///   `AIPrioritizer.reorderTop`.
+    ///
+    /// Falls back to the priority-flag heuristic ordering whenever the model
+    /// isn't ready (still downloading) or a call fails/omits items.
     func rank(_ items: [ReminderItem], consideringDueDates: Bool = true) async -> [ReminderItem] {
         guard !items.isEmpty else { return [] }
-
         let now = Date()
-        let preSorted = Self.deterministicOrder(items, consideringDueDates: consideringDueDates, now: now)
 
         #if canImport(MLXLLM) && canImport(MLXLMCommon) && arch(arm64) && !SORTED_TESTS
         guard let container = await ModelStore.shared.container() else {
-            return preSorted
+            return Self.deterministicOrder(items, consideringDueDates: consideringDueDates, now: now)
         }
 
-        var ordered: [ReminderItem] = []
-        var seen: Set<String> = []
-        // Process in big batches. In practice a reminder set is usually one
-        // batch; larger sets get successive passes, each already anchored by
-        // the deterministic pre-sort.
-        let batchSize = Self.batchSize(for: MLXModelChoice.current)
-        for start in stride(from: 0, to: preSorted.count, by: batchSize) {
-            let chunk = Array(preSorted[start..<min(start + batchSize, preSorted.count)])
-            let orderedIDs = await Self.listwiseOrder(
-                chunk, container: container, includeDates: consideringDueDates, now: now)
-            let rebuilt = Self.reorder(chunk, byIDs: orderedIDs)
-            for item in rebuilt where seen.insert(item.id).inserted {
-                ordered.append(item)
-            }
+        let choice = MLXModelChoice.current
+        // MLX-classified importance only; fallback tiers are applied at
+        // scoring time below and never cached, so they can't be served as if
+        // the model had judged them (same rule as AIPrioritizer).
+        var tiers = ImportanceCache.cachedTiers(for: items, namespace: choice.cacheNamespace)
+        let toClassify = items.filter { tiers[$0.id] == nil }
+        if !toClassify.isEmpty {
+            let classified = await Self.batchClassify(toClassify, container: container, choice: choice)
+            tiers.merge(classified) { _, new in new }
         }
-        // Safety net: append anything not emitted (shouldn't happen).
-        for item in preSorted where seen.insert(item.id).inserted {
-            ordered.append(item)
-        }
+        ImportanceCache.save(items: items, tiers: tiers, namespace: choice.cacheNamespace)
 
-        // Reassign the deterministic scores in the new order so displayed
-        // scores stay monotonically decreasing down the list, mirroring
-        // `AIPrioritizer.reorderTop`.
-        let slotScores = preSorted.map { $0.score ?? 0 }
-        return zip(ordered, slotScores).map { $0.withScore($1) }
+        let scored = items.map { item in
+            let tier = tiers[item.id] ?? UrgencyScorer.fallbackImportance(for: item)
+            return item.withScore(UrgencyScorer.score(
+                importance: tier,
+                item: item,
+                now: now,
+                consideringDueDates: consideringDueDates
+            ))
+        }
+        let ranked = Self.sortByScore(scored, originalOrder: items)
+        return await Self.reorderTop(
+            ranked, container: container, includeDates: consideringDueDates, now: now)
         #else
-        return preSorted
+        return Self.deterministicOrder(items, consideringDueDates: consideringDueDates, now: now)
         #endif
     }
     #endif
 
     // MARK: - Deterministic ordering & fallback
 
-    /// The `UrgencyScorer`-based ordering used both as the pre-sort that anchors
-    /// batches and as the fallback whenever the model can't run or omits items.
-    /// No AI importance is available in this arm's fallback, so importance is
+    /// The `UrgencyScorer`-based ordering used as the fallback whenever the
+    /// model can't run. No AI importance is available here, so importance is
     /// derived from the priority flag exactly like `AIPrioritizer`'s fallback.
     static func deterministicOrder(
         _ items: [ReminderItem],
@@ -214,7 +232,13 @@ struct MLXRanker {
                 consideringDueDates: consideringDueDates
             ))
         }
-        let originalIndex = Dictionary(uniqueKeysWithValues: items.enumerated().map { ($1.id, $0) })
+        return sortByScore(scored, originalOrder: items)
+    }
+
+    /// Highest score first; ties break by earlier due date (undated last),
+    /// then stable original order — identical to `AIPrioritizer.sortRanked`.
+    static func sortByScore(_ scored: [ReminderItem], originalOrder: [ReminderItem]) -> [ReminderItem] {
+        let originalIndex = Dictionary(uniqueKeysWithValues: originalOrder.enumerated().map { ($1.id, $0) })
         return scored.sorted { a, b in
             let scoreA = a.score ?? 0
             let scoreB = b.score ?? 0
@@ -278,6 +302,61 @@ struct MLXRanker {
             + "exactly once, most important first, space-separated."
 
         return (instructions, prompt, tokenToID)
+    }
+
+    /// Builds the per-item importance-classification prompt for a batch —
+    /// the MLX counterpart of `AIPrioritizer.classifyWithModel`'s prompt.
+    /// Content only (title, notes, list), deliberately date-blind: the model
+    /// judges consequence, never deadline pressure. Pure, so it's testable
+    /// without the model.
+    static func buildClassificationPrompt(
+        for batch: [ReminderItem]
+    ) -> (instructions: String, prompt: String, tokenToID: [String: String]) {
+        var tokenToID: [String: String] = [:]
+        let lines = batch.enumerated().map { index, item -> String in
+            let token = "R\(index)"
+            tokenToID[token] = item.id
+            return formatLine(token: token, item: item)
+        }
+
+        let instructions = """
+        You judge the real-world importance of a person's reminders \
+        (to-dos): how much it matters that each task ever gets done, based \
+        only on what the task is — its title, notes, and which list it's in. \
+        Ignore timing entirely: due dates and scheduling are handled \
+        separately by the app, so importance here means consequence, not \
+        deadline pressure. A trivial errand is still low importance even if \
+        marked urgent, and a serious obligation is still critical even with \
+        no deadline mentioned. Respond with one line per reminder in the \
+        form TOKEN=TIER, where TIER is one of critical, high, normal, low — \
+        for example "R0=high" — and nothing else: no commentary, numbering, \
+        or punctuation.
+        """
+
+        let prompt = "Classify these reminders' importance:\n" + lines.joined(separator: "\n")
+        return (instructions, prompt, tokenToID)
+    }
+
+    /// Parses classification output back into id -> tier. Open models emit
+    /// free text, so scan for `R<n>` followed by a tier word separated only
+    /// by whitespace or =/:/- punctuation; unknown tokens are dropped and
+    /// the first judgment per token wins. Pure and unit-tested.
+    static func parseTiers(_ output: String, tokenToID: [String: String]) -> [String: ImportanceTier] {
+        let scanner = output as NSString
+        let pattern = "(R[0-9]+)[\\s=:>-]+(critical|high|normal|low)"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return [:]
+        }
+        var result: [String: ImportanceTier] = [:]
+        let matches = regex.matches(in: output, range: NSRange(location: 0, length: scanner.length))
+        for match in matches {
+            let token = scanner.substring(with: match.range(at: 1))
+            let tierRaw = scanner.substring(with: match.range(at: 2)).lowercased()
+            guard let id = tokenToID[token], result[id] == nil,
+                  let tier = ImportanceTier(rawValue: tierRaw) else { continue }
+            result[id] = tier
+        }
+        return result
     }
 
     /// Parses raw model output back into reminder ids. Unlike the baseline's
@@ -373,6 +452,71 @@ extension MLXRanker: Ranker {
 
 #if canImport(MLXLLM) && canImport(MLXLMCommon) && arch(arm64) && !SORTED_TESTS
 extension MLXRanker {
+    /// Splits items into model-sized chunks and classifies each into an
+    /// importance tier — the MLX counterpart of `AIPrioritizer.batchClassify`.
+    /// A fresh `ChatSession` per chunk keeps judgments independent. Items the
+    /// model omits (or a failed chunk) yield no entry, leaving the caller's
+    /// priority-flag fallback to cover them for this rank only.
+    static func batchClassify(
+        _ items: [ReminderItem],
+        container: ModelContainer,
+        choice: MLXModelChoice
+    ) async -> [String: ImportanceTier] {
+        guard !items.isEmpty else { return [:] }
+        var result: [String: ImportanceTier] = [:]
+        let batchSize = Self.batchSize(for: choice)
+        for start in stride(from: 0, to: items.count, by: batchSize) {
+            let chunk = Array(items[start..<min(start + batchSize, items.count)])
+            let (instructions, prompt, tokenToID) = buildClassificationPrompt(for: chunk)
+            do {
+                let session = ChatSession(
+                    container,
+                    instructions: instructions,
+                    generateParameters: GenerateParameters(maxTokens: maxTokens, temperature: 0))
+                let output = try await session.respond(to: prompt)
+                let tiers = parseTiers(output, tokenToID: tokenToID)
+                #if DEBUG
+                print("MLXRanker[\(choice.rawValue)]: classified \(tiers.count)/\(chunk.count) of chunk")
+                #endif
+                result.merge(tiers) { _, new in new }
+            } catch {
+                #if DEBUG
+                print("MLXRanker[\(choice.rawValue)]: classification failed — \(error)")
+                #endif
+            }
+        }
+        return result
+    }
+
+    /// Listwise re-rank of the top of the list, mirroring
+    /// `AIPrioritizer.reorderTop`: per-item tiers pick *which* reminders
+    /// matter most, then one comparative pass orders that group side by
+    /// side. Not cached: `TopOrderCache` holds the Apple arm's orderings,
+    /// and serving one model's judgment as another's would corrupt the A/B —
+    /// one small extra call per refresh is the honest price.
+    static func reorderTop(
+        _ ranked: [ReminderItem],
+        container: ModelContainer,
+        includeDates: Bool,
+        now: Date
+    ) async -> [ReminderItem] {
+        let count = min(reorderCount, ranked.count)
+        guard count > 1 else { return ranked }
+        let candidates = Array(ranked.prefix(count))
+
+        let orderedIDs = await listwiseOrder(
+            candidates, container: container, includeDates: includeDates, now: now)
+        guard !orderedIDs.isEmpty else { return ranked }
+
+        // Rebuild the slice in the model's order (omissions keep their prior
+        // position) and reassign the slice's scores in the new order so
+        // displayed scores stay monotonically decreasing down the list.
+        let rebuilt = reorder(candidates, byIDs: orderedIDs)
+        let slotScores = candidates.map { $0.score ?? 0 }
+        let rescored = zip(rebuilt, slotScores).map { $0.withScore($1) }
+        return rescored + ranked.dropFirst(count)
+    }
+
     /// One MLX comparative pass over a batch. Builds the prompt, runs the
     /// model, parses the reply to ids. Returns an empty array on any failure so
     /// the caller falls back to the deterministic order.
