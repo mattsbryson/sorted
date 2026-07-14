@@ -4,6 +4,32 @@ options:
   deploymentTarget:
     macOS: "26.0"
   createIntermediateGroups: true
+packages:
+  # MLX Swift examples: the on-device LLM stack for the "MLX big-batch" ranker
+  # (Option 2). MLXLLM registers the concrete LLM model implementations;
+  # MLXLMCommon provides the loader (loadModelContainer) and ChatSession used
+  # by MLXRanker. This pulls in mlx-swift and swift-transformers transitively.
+  # Weights are downloaded from Hugging Face at runtime, not at build time.
+  # MLX requires an Apple-Silicon Mac.
+  MLXSwiftExamples:
+    url: https://github.com/ml-explore/mlx-swift-examples
+    from: "2.29.1"
+  # Transitive-dependency version lock, mirroring mlx-swift-examples 2.29.1's
+  # own tested Package.resolved. Its dependency ranges (`swift-transformers
+  # .upToNextMinor(from: "1.0.0")`, `swift-jinja from: 2.0.0`) otherwise let
+  # SwiftPM float swift-jinja up to 2.4.0, whose `Value.object` API
+  # (`[ObjectKey: Value]`) no longer matches swift-transformers 1.0.0's call
+  # (`[String: Value]`) — a build break in the floated combination. Pinning both
+  # to the exact revisions mlx-swift-examples 2.29.1 shipped and tested against
+  # (swift-transformers 1.0.0, swift-jinja 2.1.0) restores a compiling graph.
+  # Root revision pins override transitive version ranges in SwiftPM. Revisit
+  # when bumping mlx-swift-examples.
+  swift-transformers:
+    url: https://github.com/huggingface/swift-transformers
+    revision: a2e184dddb4757bc943e77fbe99ac6786c53f0b2
+  swift-jinja:
+    url: https://github.com/huggingface/swift-jinja.git
+    revision: c1ef5963ba4a97a589b9c9583ff4ee3352a86d23
 targets:
   Sorted:
     type: application
@@ -13,6 +39,11 @@ targets:
       # Platform-agnostic code shared verbatim with the iOS project — one
       # copy on disk, referenced by both project.ymls.
       - path: ../Shared
+    dependencies:
+      - package: MLXSwiftExamples
+        product: MLXLLM
+      - package: MLXSwiftExamples
+        product: MLXLMCommon
     info:
       path: Generated/Info.plist
       properties:
@@ -47,11 +78,20 @@ targets:
       - path: ../Shared/Models/ReminderItem.swift
       - path: ../Shared/Models/ImportanceTiers.swift
       - path: ../Shared/Services/UrgencyScorer.swift
+      # MLXRanker's prompt/parse logic is pure (Foundation only); the MLX
+      # inference paths are behind `#if canImport(MLXLLM)` so this compiles into
+      # the test bundle without linking MLX. Lets us unit-test prompt
+      # construction and output parsing even where the model can't run.
+      - path: ../Shared/Services/MLXRanker.swift
     settings:
       base:
         SWIFT_VERSION: "6.0"
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: YES
+        # Compiles MLXRanker's pure helpers into the logic-test bundle without
+        # its FoundationModels-backed Ranker/AIAvailability glue or MLX, which
+        # aren't part of this hostless bundle. See MLXRanker's SORTED_TESTS note.
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: SORTED_TESTS
 schemes:
   SortedTests:
     build:

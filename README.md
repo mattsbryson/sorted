@@ -340,3 +340,39 @@ phone (Settings → Privacy & Security → Developer Mode — this option only
 appears after Xcode's first install attempt), set a signing team, select the
 device as the run destination, and run. Free Apple ID signing re-signs every
 7 days; a paid Apple Developer Program membership extends that to a year.
+
+## MLX big-batch ranker (experimental A/B arm)
+
+Selecting **"MLX big-batch"** in Settings routes ranking through `MLXRanker`
+(`Shared/Services/MLXRanker.swift`): a larger on-device open LLM run via
+[MLX Swift](https://github.com/ml-explore/mlx-swift-examples) that judges a
+**single big batch (default 40, `MLXRanker.batchSize`) of reminders
+comparatively in one listwise pass**, restoring the whole-group signal Apple's
+~4096-token FoundationModels context caps at ~15. The prompt mirrors
+`AIPrioritizer.listwiseOrder` — tokens `R0..Rn`, app-computed relative dates,
+"emit every token once, most-important-first" — and the free-text reply is
+parsed back to ids, with any omitted/duplicated item falling back to the
+deterministic `UrgencyScorer` order.
+
+- **Model**: `mlx-community/Qwen2.5-1.5B-Instruct-4bit`, downloaded from the
+  Hugging Face hub **at runtime on first rank** (a few hundred MB), then cached
+  and reused across ranks (`ModelStore`). No weights are bundled at build time.
+  Swappable via `MLXRanker.modelID` (e.g.
+  `mlx-community/Llama-3.2-1B-Instruct-4bit`).
+- **Requires Apple Silicon.** MLX's Metal kernels have no x86_64 support, so the
+  project excludes that arch on the simulator
+  (`EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64`). Run the MLX arm on an
+  **Apple-Silicon simulator (arm64)** or a **real device**. On any slice where
+  MLX can't link (or on non-Apple-Silicon hardware), `MLXRanker` compiles the
+  MLX paths out (`#if canImport(MLXLLM) && arch(arm64)`) and degrades to the
+  deterministic ordering, and `availability` reports why — so the baseline app
+  keeps building and running everywhere.
+- **Packages** (see each `project.yml`): `mlx-swift-examples` from `2.29.1`
+  (products `MLXLLM`, `MLXLMCommon`; pulls in `mlx-swift` and
+  `swift-transformers` transitively). `swift-transformers` and `swift-jinja` are
+  pinned by revision to the exact commits `mlx-swift-examples` 2.29.1 tested
+  against (transformers 1.0.0, jinja 2.1.0); without those pins SwiftPM floats
+  jinja to a version whose API breaks transformers 1.0.0's build. Remove the
+  pins once a tagged `mlx-swift-examples` release ships a fixed dependency
+  range. Building the Metal kernels needs Xcode's Metal Toolchain component
+  (`xcodebuild -downloadComponent MetalToolchain` if missing).

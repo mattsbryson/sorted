@@ -49,8 +49,7 @@ enum RankerFactory {
             // Replaced on branch `ranker-ab/coreml-ltr` with the Core ML LTR ranker.
             return AIPrioritizer()
         case .mlx:
-            // Replaced on branch `ranker-ab/mlx-bigbatch` with the MLX ranker.
-            return AIPrioritizer()
+            return MLXRanker()
         }
     }
 }
