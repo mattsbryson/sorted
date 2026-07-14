@@ -56,8 +56,15 @@ struct RankerLabView: View {
     }
 
     /// Re-run whenever either chosen strategy or the underlying set changes.
+    /// The set is fingerprinted by hashing every id in order (stable within a
+    /// session, which is all `.task(id:)` needs) — count + first id missed
+    /// changes deeper in the list.
     private var taskKey: String {
-        "\(leftKind.rawValue)|\(rightKind.rawValue)|\(viewModel.rankedReminders.count)|\(viewModel.rankedReminders.first?.id ?? "")"
+        var hasher = Hasher()
+        for item in viewModel.rankedReminders {
+            hasher.combine(item.id)
+        }
+        return "\(leftKind.rawValue)|\(rightKind.rawValue)|\(hasher.finalize())"
     }
 
     private var content: some View {
@@ -70,7 +77,14 @@ struct RankerLabView: View {
                 ProgressView("Ranking…")
                 Spacer()
             } else {
+                // Re-runs keep the previous comparison visible but dimmed
+                // with a spinner, so a slow model pass reads as "updating"
+                // rather than "the picker did nothing".
                 comparisonList
+                    .opacity(isRunning ? 0.4 : 1)
+                    .overlay {
+                        if isRunning { ProgressView("Ranking…") }
+                    }
             }
         }
     }
@@ -220,11 +234,20 @@ struct RankerLabView: View {
 
     private func run() async {
         isRunning = true
-        defer { isRunning = false }
+        // Changing a picker (or the reminder set) changes taskKey, which
+        // cancels this task and starts a fresh one — but the awaited model
+        // calls run to completion regardless. Without the cancellation guard,
+        // a superseded run finishing late overwrote the newer run's results
+        // (pickers showing one pair, lists showing another), and a rank
+        // cancelled mid-model-call falls back to its deterministic order,
+        // which would get written over the display. Only the current run may
+        // publish; a cancelled run also leaves `isRunning` to its successor.
+        defer { if !Task.isCancelled { isRunning = false } }
         // Sequential, not concurrent: the on-device model serializes calls
         // anyway, and a fresh instance per rank keeps them independent.
         let a = await viewModel.rankForLab(leftKind)
         let b = await viewModel.rankForLab(rightKind)
+        guard !Task.isCancelled else { return }
         left = a
         right = b
     }
