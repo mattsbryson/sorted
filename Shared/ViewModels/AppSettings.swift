@@ -11,6 +11,7 @@ final class AppSettings {
         static let considerDueDates = "Sorted.settings.considerDueDates"
         static let preferenceLogging = "Sorted.settings.preferenceLogging"
         static let faceOffEnabled = "Sorted.settings.faceOffEnabled"
+        static let rankerLabEnabled = "Sorted.settings.rankerLabEnabled"
         static let ignoredLists = "Sorted.settings.ignoredLists"
         static let rankerKind = "Sorted.settings.rankerKind"
     }
@@ -54,6 +55,16 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(faceOffEnabled, forKey: Keys.faceOffEnabled) }
     }
 
+    /// When true, a "Ranker Lab" tab appears that runs the live reminder set
+    /// through two selectable strategies and shows them side by side with rank
+    /// deltas and a rank-agreement (Kendall tau) number. Read-only — it never
+    /// mutates reminders. Off by default: a power-user inspection tool for
+    /// comparing ranking strategies, not part of the everyday flow, mirroring
+    /// `faceOffEnabled`.
+    var rankerLabEnabled: Bool {
+        didSet { UserDefaults.standard.set(rankerLabEnabled, forKey: Keys.rankerLabEnabled) }
+    }
+
     /// Titles of Reminders lists the user has chosen to hide. Reminders in
     /// these lists are filtered out before ranking, so they appear nowhere
     /// in the app. Keyed by list title (EventKit's stable identifiers aren't
@@ -92,6 +103,7 @@ final class AppSettings {
         considerDueDates = (defaults.object(forKey: Keys.considerDueDates) as? Bool) ?? true
         preferenceLogging = (defaults.object(forKey: Keys.preferenceLogging) as? Bool) ?? true
         faceOffEnabled = defaults.bool(forKey: Keys.faceOffEnabled)
+        rankerLabEnabled = defaults.bool(forKey: Keys.rankerLabEnabled)
         ignoredLists = Set(defaults.stringArray(forKey: Keys.ignoredLists) ?? [])
         rankerKind = defaults.string(forKey: Keys.rankerKind).flatMap(RankerKind.init) ?? .apple
     }

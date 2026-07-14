@@ -81,6 +81,13 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Show Ranker Lab tab", isOn: $settings.rankerLabEnabled)
+                Text("Adds a read-only tab that runs your reminders through two ranking strategies side by side, highlighting which items moved and by how much, with a rank-agreement score. Nothing is changed or logged.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             if !viewModel.availableLists.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Lists")

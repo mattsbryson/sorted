@@ -240,6 +240,20 @@ final class RemindersViewModel {
         return (items[0], items[1])
     }
 
+    // MARK: Ranker Lab
+
+    /// Ranks the current live reminder set through an arbitrary strategy for
+    /// the read-only Ranker Lab, without touching `rankedReminders`, Home, or
+    /// any log. Strips existing scores first so each strategy scores from the
+    /// same neutral input rather than inheriting the active ranker's scores.
+    /// Returns the strategy's ordering; empty if there's nothing to rank.
+    func rankForLab(_ kind: RankerKind) async -> [ReminderItem] {
+        let items = rankedReminders.map { $0.withScore(nil) }
+        guard !items.isEmpty else { return [] }
+        let ranker = RankerFactory.make(kind)
+        return await ranker.rank(items, consideringDueDates: settings.considerDueDates)
+    }
+
     func skipHome() {
         guard !rankedReminders.isEmpty else { return }
         logPreference(

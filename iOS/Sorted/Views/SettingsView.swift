@@ -67,6 +67,12 @@ struct SettingsView: View {
                     Text("Adds a tab where you pick the more important of two reminders. Each pick is saved on this device as a direct comparison — the cleanest training data for a personalized ranking model.")
                 }
 
+                Section {
+                    Toggle("Show Ranker Lab tab", isOn: $settings.rankerLabEnabled)
+                } footer: {
+                    Text("Adds a read-only tab that runs your reminders through two ranking strategies side by side, highlighting which items moved and by how much, with a rank-agreement score. Nothing is changed or logged.")
+                }
+
                 if !viewModel.availableLists.isEmpty {
                     Section {
                         ForEach(viewModel.availableLists, id: \.self) { list in

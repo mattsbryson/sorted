@@ -47,6 +47,8 @@ targets:
       - path: ../Shared/Models/ReminderItem.swift
       - path: ../Shared/Models/ImportanceTiers.swift
       - path: ../Shared/Services/UrgencyScorer.swift
+      - path: ../Shared/Services/RankingMetrics.swift
+      - path: ../Shared/Services/PreferenceReconstruction.swift
     settings:
       base:
         SWIFT_VERSION: "6.0"

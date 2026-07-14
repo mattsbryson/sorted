@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		11B3A3273E5D8D9990822608 /* SnoozeUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0192E3D4356131DB69D650EA /* SnoozeUnit.swift */; };
 		1A2843EEBDC7EC9986F09A40 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4113D36294B1D922688638B /* AppSettings.swift */; };
+		2F31D4319682C49C405D3A9F /* RankingMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E7652EBAC2BA179C663926 /* RankingMetrics.swift */; };
 		450F1F16264BFDA7ECC7933C /* AIPrioritizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7D9761B7ABDC39A5546457 /* AIPrioritizer.swift */; };
 		5377C512C43CC1FC3A914C3B /* UrgencyScorer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 551882E021629D5C6D616E03 /* UrgencyScorer.swift */; };
 		55D1FA7CB13DD57E3019FEF2 /* ImportanceCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA11C0BD28F1B54CE5E7ACAE /* ImportanceCache.swift */; };
@@ -31,6 +32,7 @@
 		ECC34362BB035DAF52CDE056 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97BDAEC175A8E8F3BE5B2CD5 /* ContentView.swift */; };
 		EDD0B5E3FF0738749ED90B00 /* RemindersService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1F9FB6004E6437777ADA0B /* RemindersService.swift */; };
 		EEC58418A3C3F8F7DFA976C5 /* PreferenceLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F0A4E580588F3F621145B84 /* PreferenceLog.swift */; };
+		F21818088F5FACE3F7495A03 /* RankerLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5C5141D2AE4DFAB29578B54 /* RankerLabView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,7 +56,9 @@
 		97BDAEC175A8E8F3BE5B2CD5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		988593532702553C70F2372A /* ReminderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderItem.swift; sourceTree = "<group>"; };
 		C1A578944F86D119A1799EB5 /* TrainingLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLog.swift; sourceTree = "<group>"; };
+		C1E7652EBAC2BA179C663926 /* RankingMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingMetrics.swift; sourceTree = "<group>"; };
 		C5B7C97C5839724BC5F616BE /* RankerKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankerKind.swift; sourceTree = "<group>"; };
+		D5C5141D2AE4DFAB29578B54 /* RankerLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankerLabView.swift; sourceTree = "<group>"; };
 		D70AF91A9B5719B2B3F49369 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DA11C0BD28F1B54CE5E7ACAE /* ImportanceCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportanceCache.swift; sourceTree = "<group>"; };
 		E98742920F1419F7B062F785 /* SortedApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedApp.swift; sourceTree = "<group>"; };
@@ -66,6 +70,7 @@
 			isa = PBXGroup;
 			children = (
 				46E5196EC2772C32276476D3 /* FaceOffView.swift */,
+				D5C5141D2AE4DFAB29578B54 /* RankerLabView.swift */,
 				30504CF56E6415DE35E047B0 /* ReminderListView.swift */,
 				1436D85B0915B22A2003F07D /* ReminderRow.swift */,
 			);
@@ -106,6 +111,7 @@
 				6F0A4E580588F3F621145B84 /* PreferenceLog.swift */,
 				65D3573E1049A2AD705AF773 /* Ranker.swift */,
 				C5B7C97C5839724BC5F616BE /* RankerKind.swift */,
+				C1E7652EBAC2BA179C663926 /* RankingMetrics.swift */,
 				1C1F9FB6004E6437777ADA0B /* RemindersService.swift */,
 				6DF5AB4E7386CCB966D3EC3F /* TopOrderCache.swift */,
 				C1A578944F86D119A1799EB5 /* TrainingLog.swift */,
@@ -257,6 +263,8 @@
 				DE451B2E2B58A1DF2F994470 /* RankedOrder.swift in Sources */,
 				E2B50D8518A86383809CCAF5 /* Ranker.swift in Sources */,
 				60F0D99756775EF483CCE246 /* RankerKind.swift in Sources */,
+				F21818088F5FACE3F7495A03 /* RankerLabView.swift in Sources */,
+				2F31D4319682C49C405D3A9F /* RankingMetrics.swift in Sources */,
 				C9E93EB4F05025366B2529BE /* ReminderItem.swift in Sources */,
 				856315891292D0FE3903A50A /* ReminderListView.swift in Sources */,
 				83D2EA89B9C4904A2CC3BEE2 /* ReminderRow.swift in Sources */,

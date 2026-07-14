@@ -60,6 +60,11 @@ struct ContentView: View {
                 FaceOffView()
                     .tabItem { Label("Face Off", systemImage: "square.on.square") }
             }
+
+            if settings.rankerLabEnabled {
+                RankerLabView()
+                    .tabItem { Label("Ranker Lab", systemImage: "chart.bar.doc.horizontal") }
+            }
         }
     }
 }
