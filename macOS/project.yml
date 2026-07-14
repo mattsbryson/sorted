@@ -111,6 +111,18 @@ targets:
         # aren't part of this hostless bundle. See MLXRanker's SORTED_TESTS note.
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: SORTED_TESTS
 schemes:
+  # Listed first so it's the default scheme Xcode selects after `xcodegen
+  # generate` — otherwise the non-runnable SortedTests bundle becomes the
+  # default and the app "builds but won't launch". Runs the app; ⌘U still tests.
+  Sorted:
+    build:
+      targets:
+        Sorted: all
+    run:
+      config: Debug
+    test:
+      targets:
+        - SortedTests
   SortedTests:
     build:
       targets:
