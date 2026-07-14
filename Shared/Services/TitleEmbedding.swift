@@ -30,19 +30,30 @@ enum TitleEmbedding {
     /// Changing it invalidates any trained model.
     private static let projectionSeed: UInt64 = 0x536F72746564_01 // "Sorted",v1
 
-    /// `nonisolated(unsafe)`: immutable after load and used read-only, same
-    /// justification as `CoreMLRanker.model` (NLEmbedding isn't `Sendable`).
-    nonisolated(unsafe) private static let sentenceEmbedding: NLEmbedding? =
-        NLEmbedding.sentenceEmbedding(for: .english)
+    /// NLEmbedding is **not thread-safe**: concurrent `vector(for:)` calls
+    /// on a shared instance crash (hit in practice — the Ranker Lab ranks
+    /// two strategies while a quiet refresh can rank a third). All access is
+    /// serialized through `lock`; `nonisolated(unsafe)` is sound *because*
+    /// every touch happens under it.
+    nonisolated(unsafe) private static var sentenceEmbedding: NLEmbedding?
+    nonisolated(unsafe) private static var embeddingLoaded = false
+    private static let lock = NSLock()
 
     /// `dimension` floats, L2-normalized; all zeros when no embedding is
     /// available for the text.
     static func vector(for text: String) -> [Double] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let embedding = sentenceEmbedding,
-              let raw = embedding.vector(for: trimmed)
-        else { return [Double](repeating: 0, count: dimension) }
+        guard !trimmed.isEmpty else { return [Double](repeating: 0, count: dimension) }
+
+        lock.lock()
+        if !embeddingLoaded {
+            embeddingLoaded = true
+            sentenceEmbedding = NLEmbedding.sentenceEmbedding(for: .english)
+        }
+        let raw = sentenceEmbedding?.vector(for: trimmed)
+        lock.unlock()
+
+        guard let raw else { return [Double](repeating: 0, count: dimension) }
         return normalize(project(raw))
     }
 
