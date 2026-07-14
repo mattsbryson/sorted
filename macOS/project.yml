@@ -13,6 +13,12 @@ targets:
       # Platform-agnostic code shared verbatim with the iOS project — one
       # copy on disk, referenced by both project.ymls.
       - path: ../Shared
+        excludes:
+          - Resources/**
+      # Core ML LTR model, bundled as a compiled resource (Xcode compiles the
+      # .mlpackage to .mlmodelc at build). Trained by Tooling/CoreMLLTR.
+      - path: ../Shared/Resources/ImportanceRanker.mlpackage
+        buildPhase: resources
     info:
       path: Generated/Info.plist
       properties:
@@ -47,8 +53,18 @@ targets:
       - path: ../Shared/Models/ReminderItem.swift
       - path: ../Shared/Models/ImportanceTiers.swift
       - path: ../Shared/Services/UrgencyScorer.swift
+      # A/B tooling metrics under test.
       - path: ../Shared/Services/RankingMetrics.swift
       - path: ../Shared/Services/PreferenceReconstruction.swift
+      # Core ML LTR ranker under test, plus the protocol/availability types it
+      # depends on. AIPrioritizer is pulled in only because the Ranker protocol
+      # extends it; the tests exercise CoreMLRanker's pure feature/scoring code.
+      - path: ../Shared/Services/CoreMLRanker.swift
+      - path: ../Shared/Services/Ranker.swift
+      - path: ../Shared/Services/AIPrioritizer.swift
+      - path: ../Shared/Services/ImportanceCache.swift
+      - path: ../Shared/Services/TopOrderCache.swift
+      - path: ../Shared/Models/RankedOrder.swift
     settings:
       base:
         SWIFT_VERSION: "6.0"

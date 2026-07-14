@@ -46,8 +46,9 @@ enum RankerFactory {
         case .apple:
             return AIPrioritizer()
         case .coreML:
-            // Replaced on branch `ranker-ab/coreml-ltr` with the Core ML LTR ranker.
-            return AIPrioritizer()
+            // Core ML LTR ranker (branch `ranker-ab/coreml-ltr`). Falls back to
+            // the heuristic ordering internally when its model isn't bundled.
+            return CoreMLRanker()
         case .mlx:
             // Replaced on branch `ranker-ab/mlx-bigbatch` with the MLX ranker.
             return AIPrioritizer()

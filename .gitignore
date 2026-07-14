@@ -3,3 +3,9 @@ xcuserdata/
 DerivedData/
 build/
 *.xcuserstate
+
+# Core ML LTR training pipeline
+Tooling/CoreMLLTR/.venv/
+# The freshly-trained model output; the shipped copy lives in Shared/Resources/
+Tooling/CoreMLLTR/ImportanceRanker.mlpackage/
+Tooling/CoreMLLTR/__pycache__/

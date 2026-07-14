@@ -13,6 +13,12 @@ targets:
       # Platform-agnostic code shared verbatim with the macOS project — one
       # copy on disk, referenced by both project.ymls.
       - path: ../Shared
+        excludes:
+          - Resources/**
+      # Core ML LTR model, bundled as a compiled resource (Xcode compiles the
+      # .mlpackage to .mlmodelc at build). Trained by Tooling/CoreMLLTR.
+      - path: ../Shared/Resources/ImportanceRanker.mlpackage
+        buildPhase: resources
     info:
       path: Generated/Info.plist
       properties:
