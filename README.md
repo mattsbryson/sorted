@@ -69,10 +69,20 @@ cd macOS && xcodebuild test -scheme SortedTests -destination 'platform=macOS'
 
 - **Face Off** — an optional fifth tab (off by default; enable it under
   Settings) that shows two reminders and asks which is more important. Each
-  pick is logged as explicit pairwise training data (see below). Pairs are
-  drawn biased toward reminders near each other in the current ranking —
-  the comparisons the ranker is least sure about, so the most informative
-  labels — with left/right randomized so position isn't a tell.
+  pick is logged as explicit pairwise training data (see below).
+  - Runs as a **single-elimination bracket** over a sampled pool of 16
+    reminders: round one is random, but winners advance to face other
+    winners, so successive comparisons are between increasingly important
+    reminders — the highest-signal labels, near the top of the importance
+    scale where ranking accuracy matters most. Odd reminders advance by
+    bye; a resolved bracket reseeds with a fresh sample.
+  - A pair is **never asked twice**: everything already compared — in the
+    on-device log (imported history included) or skipped this session — is
+    excluded from pairing. Left/right stays randomized so position isn't a
+    tell. Skip records nothing and advances neither reminder.
+  - Recent picks also feed straight back into ranking as prompt
+    calibration (see "Few-shot calibration" below) — Face Off improves the
+    ranking *today*, not just after a future training run.
 
 Upcoming and Someday have a **search field** (filtering by title, notes, and
 list name) since those lists grow long; Today is already a short curated
@@ -116,7 +126,10 @@ via `UserDefaults`):
   disabled until at least one event has been logged.
 - **Show Face Off tab** — off by default; adds the Face Off tab described
   above. **Export Face-Off Log…** next to it exports the pairwise-judgment
-  log the same way, as a separate `.jsonl` file.
+  log the same way, as a separate `.jsonl` file. **Import Face-Off Log…**
+  merges a log exported from another device into this device's log — e.g.
+  pull the iPhone's face-offs into the Mac — so prompt calibration, pair
+  dedupe, and future training all see the combined history.
 - **Lists** — one toggle per Reminders list (fetched live from EventKit,
   including empty lists). Turning a list off adds it to an ignored set;
   reminders in ignored lists are filtered out *before* ranking, so they
@@ -206,6 +219,23 @@ excluded from what the AI classification call sees.
 The model's context window can't hold an unlimited number of reminders in one
 call, so classification is split into chunks of at most 15 (kept
 deliberately small so each reminder gets more individual attention).
+
+**Few-shot calibration in the classification prompt**
+(`ClassificationExamples.swift`, shared verbatim by the Apple and MLX arms so
+their rubrics can't drift):
+
+- **Tier anchors** — four canonical examples, one per tier ("schedule
+  follow-up for abnormal blood test" = critical … "someday: try that ramen
+  place" = low), pinning the rubric's scale. Judged in the abstract, small
+  models drift toward calling everything "high"; anchors give the scale a
+  fixed reference.
+- **The user's own judgments** — the five most recent Face Off picks are
+  included as relative examples ("X matters more than Y"), personalizing the
+  importance judgment immediately, before the trained custom model exists.
+  The importance cache key carries a prompt version (bumped when the rubric
+  changes, so everything re-judges once under a new prompt), but the ongoing
+  drift of these calibration examples is deliberately *not* versioned —
+  versioning it would evict the whole cache on every Face Off pick.
 
 **A single up-front pass.** Classification happens synchronously, before the
 tabs appear — there's no background refinement step. An earlier version
@@ -341,24 +371,31 @@ appears after Xcode's first install attempt), set a signing team, select the
 device as the run destination, and run. Free Apple ID signing re-signs every
 7 days; a paid Apple Developer Program membership extends that to a year.
 
-## MLX big-batch ranker (experimental A/B arm)
+## MLX ranker (experimental A/B arm)
 
 Selecting **"MLX big-batch"** in Settings routes ranking through `MLXRanker`
-(`Shared/Services/MLXRanker.swift`): a larger on-device open LLM run via
-[MLX Swift](https://github.com/ml-explore/mlx-swift-examples) that judges a
-**single big batch (default 40, `MLXRanker.batchSize`) of reminders
-comparatively in one listwise pass**, restoring the whole-group signal Apple's
-~4096-token FoundationModels context caps at ~15. The prompt mirrors
-`AIPrioritizer.listwiseOrder` — tokens `R0..Rn`, app-computed relative dates,
-"emit every token once, most-important-first" — and the free-text reply is
-parsed back to ids, with any omitted/duplicated item falling back to the
-deterministic `UrgencyScorer` order.
+(`Shared/Services/MLXRanker.swift`): an on-device open LLM run via
+[MLX Swift](https://github.com/ml-explore/mlx-swift-examples), used with
+**exactly the Apple arm's two-axis architecture** — per-item importance
+classification (date-blind, chunked prompts parsed defensively from free
+text, cached per reminder *per model* so one model's judgments are never
+served as another's) + deterministic `UrgencyScorer` time urgency + one
+listwise re-rank of the top 15.
 
-- **Model**: `mlx-community/Qwen2.5-1.5B-Instruct-4bit`, downloaded from the
-  Hugging Face hub **at runtime on first rank** (a few hundred MB), then cached
-  and reused across ranks (`ModelStore`). No weights are bundled at build time.
-  Swappable via `MLXRanker.modelID` (e.g.
-  `mlx-community/Llama-3.2-1B-Instruct-4bit`).
+This arm originally ranked with a single large comparative pass (~40
+reminders judged together in one prompt). **A/B testing showed Apple's
+per-item structure beating pure listwise on every MLX model tried**, so the
+arm now varies only the *model*, not the design — the open question it
+answers is whether a bigger open model classifies importance better than
+Apple's ~3B on-device model.
+
+- **Model**: chosen in Settings ("MLX model"): Qwen 2.5 1.5B (balanced,
+  default), Llama 3.2 1B (fastest; gets smaller 20-item chunks — it degrades
+  holding larger comparisons), or Qwen 2.5 3B (best, ~2GB). Downloaded from
+  the Hugging Face hub **in the background on first rank** (ranking falls
+  back to the deterministic order until it's ready — a rank never blocks on
+  the download), then cached and reused across ranks (`ModelStore`). No
+  weights are bundled at build time.
 - **Requires Apple Silicon.** MLX's Metal kernels have no x86_64 support, so the
   project excludes that arch on the simulator
   (`EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64`). Run the MLX arm on an
