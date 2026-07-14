@@ -6,7 +6,7 @@ enum AIAvailability: Sendable {
     case unavailable(String)
 }
 
-struct AIPrioritizer {
+struct AIPrioritizer: Sendable {
     /// The model's context window limits how many reminders can be judged in
     /// a single call. Kept small (well under the 4096-token ceiling) so each
     /// reminder gets more careful individual attention rather than being

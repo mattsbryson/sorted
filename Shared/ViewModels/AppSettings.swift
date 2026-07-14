@@ -12,6 +12,7 @@ final class AppSettings {
         static let preferenceLogging = "Sorted.settings.preferenceLogging"
         static let faceOffEnabled = "Sorted.settings.faceOffEnabled"
         static let ignoredLists = "Sorted.settings.ignoredLists"
+        static let rankerKind = "Sorted.settings.rankerKind"
     }
 
     static let todayLimitRange = 1...20
@@ -63,6 +64,13 @@ final class AppSettings {
         }
     }
 
+    /// Which ranking strategy is active. Lets the experimental Core ML and MLX
+    /// rankers be A/B'd against the Apple baseline at runtime. Defaults to the
+    /// shipping baseline so a fresh install behaves exactly as before.
+    var rankerKind: RankerKind {
+        didSet { UserDefaults.standard.set(rankerKind.rawValue, forKey: Keys.rankerKind) }
+    }
+
     func isListIgnored(_ list: String) -> Bool { ignoredLists.contains(list) }
 
     func setList(_ list: String, ignored: Bool) {
@@ -85,5 +93,6 @@ final class AppSettings {
         preferenceLogging = (defaults.object(forKey: Keys.preferenceLogging) as? Bool) ?? true
         faceOffEnabled = defaults.bool(forKey: Keys.faceOffEnabled)
         ignoredLists = Set(defaults.stringArray(forKey: Keys.ignoredLists) ?? [])
+        rankerKind = defaults.string(forKey: Keys.rankerKind).flatMap(RankerKind.init) ?? .apple
     }
 }

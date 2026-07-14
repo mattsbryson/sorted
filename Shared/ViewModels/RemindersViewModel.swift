@@ -27,7 +27,12 @@ final class RemindersViewModel {
     let settings = AppSettings()
 
     private let remindersService = RemindersService()
-    private let prioritizer = AIPrioritizer()
+
+    /// The active ranking strategy, rebuilt from the user's `rankerKind`
+    /// setting each rank so switching strategies in Settings takes effect on
+    /// the next refresh. Strategies keep any loaded model in shared/static
+    /// storage, so building a fresh instance per rank is cheap.
+    private var prioritizer: any Ranker { RankerFactory.make(settings.rankerKind) }
 
     var homeReminder: ReminderItem? {
         guard !rankedReminders.isEmpty, homeIndex < rankedReminders.count else { return nil }
@@ -64,7 +69,8 @@ final class RemindersViewModel {
         // leaving the window blank (black in dark mode) until it returned.
         // A detached task keeps it off the main thread so the loading
         // spinner renders and animates immediately.
-        let availability = await Task.detached { AIPrioritizer.availability }.value
+        let ranker = prioritizer
+        let availability = await Task.detached { ranker.availability }.value
         if case .unavailable(let reason) = availability {
             aiNote = reason
         } else {

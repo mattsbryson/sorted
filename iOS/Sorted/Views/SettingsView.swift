@@ -24,6 +24,18 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Picker("Ranking model", selection: $settings.rankerKind) {
+                        ForEach(RankerKind.allCases, id: \.self) { kind in
+                            Text(kind.displayName).tag(kind)
+                        }
+                    }
+                } header: {
+                    Text("Experimental")
+                } footer: {
+                    Text(settings.rankerKind.detail)
+                }
+
+                Section {
                     Toggle("Show urgency score", isOn: $settings.showUrgencyScore)
                 } footer: {
                     Text("Displays each reminder's 0-100 urgency score (from Apple Intelligence, or a heuristic estimate) alongside its priority.")
@@ -87,6 +99,10 @@ struct SettingsView: View {
             // No model calls happen here — importance stays cached; only the
             // deterministic score composition changes.
             .onChange(of: settings.considerDueDates) {
+                Task { await viewModel.refresh() }
+            }
+            // Switching strategy re-ranks from scratch with the new model.
+            .onChange(of: settings.rankerKind) {
                 Task { await viewModel.refresh() }
             }
             // Hiding/showing a list changes which reminders exist for
