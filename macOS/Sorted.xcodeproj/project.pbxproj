@@ -33,6 +33,7 @@
 		9BFD6D64A5C85582F72DCA97 /* ReminderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F76EAD1BF6D3520FB939C478 /* ReminderItem.swift */; };
 		9D57E971B11126B88F350C81 /* RankedOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC2C542B36B7E7417CE0071 /* RankedOrder.swift */; };
 		A8A8EF63DAB876F589C9AC5E /* TrainingLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C56760078EA1686578469FCB /* TrainingLog.swift */; };
+		AC05ED2198CABC2D1A7CAEDC /* FaceOffLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF15EE4E88D933A586E3D186 /* FaceOffLogTests.swift */; };
 		B32419E3DE0A19ABBAAE408A /* TrainingLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C56760078EA1686578469FCB /* TrainingLog.swift */; };
 		B47FF03DE6CB4F8AA8AA22F7 /* RankerKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9932E56A3E934086A7C7E075 /* RankerKind.swift */; };
 		B4F433F388DDB035B9725757 /* PreferenceReconstruction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81C9B83E28E199A21C41D67B /* PreferenceReconstruction.swift */; };
@@ -96,6 +97,7 @@
 		D70AF91A9B5719B2B3F49369 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		D7F82E3A6C4F42E4665C9DCE /* FaceOffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceOffView.swift; sourceTree = "<group>"; };
 		DA619F8803F6BCC59BC58A04 /* RemindersViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersViewModel.swift; sourceTree = "<group>"; };
+		DF15EE4E88D933A586E3D186 /* FaceOffLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceOffLogTests.swift; sourceTree = "<group>"; };
 		E23E0A399B419EE0201FEB26 /* ImportanceRanker.mlpackage */ = {isa = PBXFileReference; path = ImportanceRanker.mlpackage; sourceTree = "<group>"; };
 		E98742920F1419F7B062F785 /* SortedApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortedApp.swift; sourceTree = "<group>"; };
 		F76EAD1BF6D3520FB939C478 /* ReminderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderItem.swift; sourceTree = "<group>"; };
@@ -118,6 +120,7 @@
 			isa = PBXGroup;
 			children = (
 				C506870A144838C8DDF70FA1 /* CoreMLRankerTests.swift */,
+				DF15EE4E88D933A586E3D186 /* FaceOffLogTests.swift */,
 				5990ED4FE6E6E29770031793 /* MLXRankerTests.swift */,
 				750CF66329635BF426357F84 /* RankingMetricsTests.swift */,
 				786B85AE0C641FB8E943025A /* UrgencyScorerTests.swift */,
@@ -393,6 +396,7 @@
 				C5F14F283DC9614D1A5A109C /* CoreMLRanker.swift in Sources */,
 				DADEEEBCF08722A374E52666 /* CoreMLRankerTests.swift in Sources */,
 				3A0E04705FF82FC411F0D21F /* FaceOffLog.swift in Sources */,
+				AC05ED2198CABC2D1A7CAEDC /* FaceOffLogTests.swift in Sources */,
 				E2D9A44BEE0FBD747730BA2F /* ImportanceCache.swift in Sources */,
 				F21D4670DD74DF654EA8CA56 /* ImportanceTiers.swift in Sources */,
 				8F3E525EA85CE4434EEEA0A3 /* MLXRanker.swift in Sources */,

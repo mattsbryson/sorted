@@ -304,6 +304,18 @@ exported. They share their file machinery and per-reminder feature schema
   cleanest signal of the two: a direct pairwise label with no ranked-order
   noise to untangle. Written only while the Face Off tab is enabled.
 
+**Merging data across devices.** Each device's local log is its canonical
+store; exports are *cumulative* (the whole history every time), so
+successive exports of the same device overlap heavily. "Import Face-Off
+Log…" is therefore an **idempotent merge**: events are identified by
+timestamp + pair, anything already present is skipped, and the pass also
+compacts the local log (healing duplicates from earlier naive imports).
+Importing the same export twice — or an older export after a newer one —
+adds nothing. Workflow: export from the iPhone whenever, import on the Mac
+in any order, and the Mac's log (which `train.py` reads directly, and which
+prompt calibration and Face Off pair-dedupe consult) is always the combined,
+duplicate-free history.
+
 ### Loading screen
 
 Because classification is a single synchronous pass, `refresh()` always

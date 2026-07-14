@@ -49,8 +49,31 @@ enum FaceOffLog {
     }
 
     private struct DecodedEvent: Decodable {
+        let ts: String
         let winner: DecodedReminder
         let loser: DecodedReminder
+    }
+
+    /// Identity of one logged event across devices and exports: the same
+    /// pick of the same pair at the same second. Distinct re-judgments of a
+    /// pair (different timestamps) are distinct events and are kept.
+    private static func eventKey(_ event: DecodedEvent) -> String {
+        [event.ts, event.winner.id, event.loser.id].joined(separator: "|")
+    }
+
+    /// Splits a log blob into JSON lines and returns those whose event key
+    /// isn't already in `seenKeys`, adding kept keys as it goes — so calling
+    /// this over successive blobs yields their de-duplicated union in order.
+    /// Undecodable lines are dropped (they're unusable as training data).
+    static func dedupedLines(_ blob: Data, seenKeys: inout Set<String>) -> [Data] {
+        let decoder = JSONDecoder()
+        return blob.split(separator: UInt8(ascii: "\n")).compactMap { line in
+            let lineData = Data(line)
+            guard let event = try? decoder.decode(DecodedEvent.self, from: lineData),
+                  seenKeys.insert(eventKey(event)).inserted
+            else { return nil }
+            return lineData
+        }
     }
 
     /// Order-independent key identifying a pair regardless of who won or
@@ -88,24 +111,46 @@ enum FaceOffLog {
         Set(allJudgments().map { pairKey($0.winnerID, $0.loserID) })
     }
 
-    // MARK: Import
+    // MARK: Import (idempotent merge + compaction)
 
-    /// Appends an exported log (e.g. from the iPhone app) into this device's
-    /// log, line by line, skipping anything that doesn't decode as a face-off
-    /// event. Returns how many judgments were imported. Duplicated history is
-    /// possible if the same export is imported twice; harmless for training
-    /// (a repeated true label) and excluded from pair selection either way.
+    /// Merges an exported log (e.g. from the iPhone app) into this device's
+    /// log and returns how many *new* judgments were added.
+    ///
+    /// Exports are cumulative — each one contains the device's whole history
+    /// — so overlap with what's already here is the norm, not the exception.
+    /// Import is therefore an **idempotent merge**: events are identified by
+    /// timestamp + pair, anything already present is skipped, and importing
+    /// the same (or an older, subset) export twice adds nothing. The pass
+    /// also rewrites the current file de-duplicated against itself and the
+    /// rotated history, healing duplicates left by earlier naive imports.
+    /// The local log is the canonical store; exporting it yields the
+    /// combined history for training.
     @discardableResult
     static func importData(_ data: Data) -> Int {
-        let decoder = JSONDecoder()
-        var imported = 0
-        for line in data.split(separator: UInt8(ascii: "\n")) {
-            let lineData = Data(line)
-            guard (try? decoder.decode(DecodedEvent.self, from: lineData)) != nil else { continue }
-            TrainingLog.append(lineData, to: fileURL)
-            imported += 1
+        var seen = Set<String>()
+
+        // Rotated history is old and bounded — left untouched, but its keys
+        // seed the dedupe so nothing it holds is duplicated again.
+        let rotated = (try? Data(contentsOf: TrainingLog.rotatedURL(for: fileURL))) ?? Data()
+        _ = dedupedLines(rotated, seenKeys: &seen)
+
+        let current = (try? Data(contentsOf: fileURL)) ?? Data()
+        let compacted = dedupedLines(current, seenKeys: &seen)
+        let fresh = dedupedLines(data, seenKeys: &seen)
+
+        var merged = Data()
+        for line in compacted + fresh {
+            merged.append(line)
+            merged.append(UInt8(ascii: "\n"))
         }
-        return imported
+        do {
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try merged.write(to: fileURL, options: .atomic)
+        } catch {
+            return 0
+        }
+        return fresh.count
     }
 
     // MARK: Export
