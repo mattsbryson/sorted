@@ -3,7 +3,19 @@
 ## To do
 
 - Write and train our own model for reminder sorting, and deploy that.
-- Allow user input for training in the app.
+  *(In progress — a first Core ML model trained on real face-off data ships
+  in the app; see "AI approach — working notes" at the bottom.)*
+- ~~Allow user input for training in the app.~~ *(Done: Face Off tab +
+  implicit preference logging.)*
+- **Sync "Option B"** — upgrade training-data sync from the shipped
+  folder-based approach (Option A: each device publishes its log to a
+  user-chosen iCloud Drive folder and merges the others' — see
+  `FaceOffSync.swift`) to a real iCloud container (CloudKit or ubiquity
+  storage): zero-setup, no folder picking, background push. Blocked on
+  provisioning: iCloud entitlements require a **paid** Apple Developer
+  Program membership; adding them under free signing breaks the build.
+  Also more code and harder to debug — do it when the folder approach
+  chafes, not before.
 
 A native app (macOS and iOS) that reads your Apple Reminders and ranks them by
 importance using Apple's on-device Foundation Models framework (Apple
@@ -425,3 +437,78 @@ Apple's ~3B on-device model.
   pins once a tagged `mlx-swift-examples` release ships a fixed dependency
   range. Building the Metal kernels needs Xcode's Metal Toolchain component
   (`xcodebuild -downloadComponent MetalToolchain` if missing).
+
+## AI approach — working notes (2026-07-14)
+
+Status notes for future sessions (human or AI). The mechanics are documented
+in the sections above; this is the strategy, the evidence, and what's next.
+
+**Goal.** Rank reminders by *personal* importance, ultimately with a model
+trained on the user's own feedback.
+
+**Architecture verdict (A/B-tested, settled).** The two-axis design won:
+per-item importance classification (date-blind, cached) + deterministic time
+urgency in code + one listwise re-rank of the top 15. A pure listwise
+big-batch pass over ~40 reminders — despite being the founding premise of
+the MLX arm — **lost to per-item classification on every model tried**. All
+ranking strategies now share the architecture and vary only the importance
+source, behind the `Ranker` protocol / `RankerFactory` seam (runtime picker
+in Settings → Experimental; read-only side-by-side comparison in the Ranker
+Lab tab; offline metrics in `Tooling/RankerEval`).
+
+**The three strategies.**
+- **Apple (baseline, default)** — FoundationModels. The one to beat.
+- **Core ML LTR** — 48-feature linear ranker trained on the face-off logs
+  (`Tooling/CoreMLLTR`). Features: priority one-hot, list hash buckets,
+  length stats, and a 32-dim semantic title embedding
+  (`TitleEmbedding.swift`; Swift/Python parity via `Tooling/EmbedTool` —
+  training shells out to the app's own code, nothing reimplemented).
+- **MLX** — open LLM (Qwen 1.5B/3B, Llama 1B; Settings-selectable) doing the
+  same classification job as Apple's model. Open question it exists to
+  answer: does a bigger open model judge importance better than Apple's ~3B?
+
+**Empirical findings so far (181 real face-off pairs).**
+- Training accuracy is a mirage (89% while held-out was coin-flip). Always
+  judge by the **held-out** number `train.py` now prints (newest 20% of
+  pairs, time-split).
+- Old 16-feature schema: **48.6%** held-out — chance. Diagnosis: ~half of
+  real pairs are same-list + same-priority, invisible without reading the
+  title. With title embeddings: **55.6%**. Real but modest; with only 181
+  pairs / 36 test pairs, error bars are wide.
+- **The current lever is data, not features**: a few hundred more
+  bracket-mode Face Off picks, then retrain and watch held-out.
+- Both LLM prompts carry few-shot calibration: fixed tier anchors + the
+  user's 5 most recent face-off picks (`ClassificationExamples.swift`) —
+  personalization that works today, independent of the trained model.
+
+**Retraining quickstart** (needs macOS + Swift toolchain + Python ≤ 3.13):
+```
+cd Tooling/CoreMLLTR && python3.13 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python train.py            # reads the Mac app's live logs; prints held-out
+cp -R ImportanceRanker.mlpackage ../../Shared/Resources/
+(cd ../../macOS && xcodegen generate); (cd ../../iOS && xcodegen generate)
+```
+
+**Data flow.** Face Off runs as a single-elimination bracket (winners meet
+winners → high-signal comparisons near the top; no pair ever repeats).
+Logs are per-device and canonical locally; exports are cumulative and
+imports are idempotent compacting merges, so merging in any order/repetition
+is safe. Cross-device sync is folder-based ("Option A", `FaceOffSync.swift`):
+each device publishes `faceoffs-<id>.jsonl` to a user-chosen iCloud Drive
+folder and merges the others' on launch and after picks.
+
+**Known gaps / cautions.**
+- The Core ML *model-backed* path and MLX *runtime inference* still haven't
+  been verified end-to-end in a running app by automated means — only by
+  builds, unit tests of the pure logic, and manual use.
+- `NLEmbedding` is not thread-safe (crashed in the Ranker Lab); all access
+  is serialized inside `TitleEmbedding`. Its assets can also differ across
+  OS versions, so embeddings are approximate across devices — retraining
+  re-anchors.
+- The importance cache is versioned by prompt (`ImportanceCache.promptVersion`);
+  bump it when the classification rubric changes so old judgments don't
+  linger.
+- MLX model downloads happen in the background on first use; ranking falls
+  back to deterministic order until ready (never block a rank on a
+  download — that hung the app once).

@@ -86,6 +86,11 @@ final class RemindersViewModel {
             remindersService.observeChanges { [weak self] in
                 self?.scheduleDatabaseRefresh()
             }
+            // Pull other devices' face-off history (and publish ours) in the
+            // background; no-op unless a sync folder is configured. Merged
+            // judgments are picked up by prompt calibration on the next
+            // classification and by Face Off at the next bracket seed.
+            Task.detached(priority: .utility) { FaceOffSync.sync() }
             await refresh()
         } catch {
             loadState = .error(error.localizedDescription)
@@ -224,6 +229,10 @@ final class RemindersViewModel {
         }
     }
 
+    /// Debounces publishing to the sync folder so a rapid face-off session
+    /// writes once at the end, not per pick.
+    private var faceOffSyncDebounce: Task<Void, Never>?
+
     /// Records the user's explicit judgment, advances the winner in the
     /// bracket, and shows the next pair.
     func chooseFaceOff(winner: ReminderItem, loser: ReminderItem) {
@@ -232,6 +241,12 @@ final class RemindersViewModel {
         faceOffCount += 1
         faceOffWinners.append(winner)
         faceOffPair = nextFaceOffPair()
+
+        faceOffSyncDebounce?.cancel()
+        faceOffSyncDebounce = Task.detached(priority: .utility) {
+            do { try await Task.sleep(for: .seconds(5)) } catch { return }
+            FaceOffSync.sync()
+        }
     }
 
     /// Swaps in a new pair without recording a judgment (the two shown were

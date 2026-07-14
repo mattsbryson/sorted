@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var showingLogExporter = false
     @State private var showingFaceOffExporter = false
     @State private var showingFaceOffImporter = false
+    @State private var showingSyncFolderPicker = false
+    @State private var syncFolderName = FaceOffSync.folderDisplayName
     @State private var rankingInputsAtOpen: RankingInputs?
 
     var body: some View {
@@ -84,8 +86,19 @@ struct SettingsView: View {
                     Button("Import Face-Off Log…") {
                         showingFaceOffImporter = true
                     }
+                    if let folder = syncFolderName {
+                        LabeledContent("Syncing via", value: folder)
+                        Button("Stop Syncing", role: .destructive) {
+                            FaceOffSync.disable()
+                            syncFolderName = nil
+                        }
+                    } else {
+                        Button("Sync via iCloud Folder…") {
+                            showingSyncFolderPicker = true
+                        }
+                    }
                 } footer: {
-                    Text("Adds a tab where you pick the more important of two reminders. Each pick is saved on this device as a direct comparison — the cleanest training data for a personalized ranking model. Import merges a log exported from another device.")
+                    Text("Adds a tab where you pick the more important of two reminders. Each pick is saved on this device as a direct comparison — the cleanest training data for a personalized ranking model. Import merges a log exported from another device; pick a shared iCloud Drive folder on each device to merge automatically.")
                 }
 
                 Section {
@@ -135,6 +148,17 @@ struct SettingsView: View {
                 if let data = try? Data(contentsOf: url) {
                     FaceOffLog.importData(data)
                 }
+            }
+            // Option A sync: remember a shared iCloud Drive folder; each
+            // device publishes its own log there and merges the others'.
+            .fileImporter(
+                isPresented: $showingSyncFolderPicker,
+                allowedContentTypes: [.folder]
+            ) { result in
+                guard case .success(let url) = result else { return }
+                FaceOffSync.configure(folder: url)
+                syncFolderName = FaceOffSync.folderDisplayName
+                Task.detached(priority: .utility) { FaceOffSync.sync() }
             }
             // Re-rank once, after Settings closes — never on each toggle.
             // refresh() flips loadState to .loading, which swaps the tabs

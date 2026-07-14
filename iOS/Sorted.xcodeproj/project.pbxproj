@@ -37,6 +37,7 @@
 		D85F6A1381338FE2FCFAD4EE /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CA3A458E5373C50BCF7F52 /* AppSettings.swift */; };
 		D996F9830EC88F9AF3E1CF1B /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 349E14B64E353AE1944B942E /* MLXLLM */; };
 		DB6E1225021D740310597605 /* PreferenceLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B51691D1A86138801DA88CE /* PreferenceLog.swift */; };
+		DC4177DF1C552E9B77D5B272 /* FaceOffSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BFB17C54FCC4086A7D7CA46 /* FaceOffSync.swift */; };
 		E268D855424B4FD0C11FB114 /* CoreMLRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02755109E25EC05647AEB27F /* CoreMLRanker.swift */; };
 		E63A34BE4BCA18BC8D5141E7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70AF91A9B5719B2B3F49369 /* SettingsView.swift */; };
 		ECC34362BB035DAF52CDE056 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97BDAEC175A8E8F3BE5B2CD5 /* ContentView.swift */; };
@@ -61,6 +62,7 @@
 		7BA51545ED831DD2FC370118 /* RankerLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankerLabView.swift; sourceTree = "<group>"; };
 		81C9B83E28E199A21C41D67B /* PreferenceReconstruction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferenceReconstruction.swift; sourceTree = "<group>"; };
 		8A43C43EC1F74BD72EFA63ED /* UrgencyScorer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrgencyScorer.swift; sourceTree = "<group>"; };
+		8BFB17C54FCC4086A7D7CA46 /* FaceOffSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceOffSync.swift; sourceTree = "<group>"; };
 		97BDAEC175A8E8F3BE5B2CD5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		9932E56A3E934086A7C7E075 /* RankerKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankerKind.swift; sourceTree = "<group>"; };
 		9BC70D27DF84A6DED4E4842A /* Ranker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ranker.swift; sourceTree = "<group>"; };
@@ -145,6 +147,7 @@
 				341D9B04BCE8CCFFD94CCC2C /* ClassificationExamples.swift */,
 				02755109E25EC05647AEB27F /* CoreMLRanker.swift */,
 				17B964744365FCB5AF5DC27A /* FaceOffLog.swift */,
+				8BFB17C54FCC4086A7D7CA46 /* FaceOffSync.swift */,
 				55270E0FD69D4F8C5D892F04 /* ImportanceCache.swift */,
 				BD683E9BA69B2A0922F2B384 /* MLXRanker.swift */,
 				0B51691D1A86138801DA88CE /* PreferenceLog.swift */,
@@ -306,6 +309,7 @@
 				ECC34362BB035DAF52CDE056 /* ContentView.swift in Sources */,
 				E268D855424B4FD0C11FB114 /* CoreMLRanker.swift in Sources */,
 				00D850C820A39AF893A81BA5 /* FaceOffLog.swift in Sources */,
+				DC4177DF1C552E9B77D5B272 /* FaceOffSync.swift in Sources */,
 				31963A899B17A077EAE8D790 /* FaceOffView.swift in Sources */,
 				C722E991153F6ACF120AA3C9 /* HomeView.swift in Sources */,
 				CBB3801989E23FF0A1EFE346 /* ImportanceCache.swift in Sources */,
