@@ -76,10 +76,11 @@ struct MLXRanker {
         if ModelStore.shared.isLoaded {
             return .available
         }
-        // Not yet loaded: the model downloads/loads lazily on first rank. We
-        // report available (it *can* run) but note the one-time fetch so the UI
-        // can explain the initial delay.
-        return .available
+        // Not yet loaded: the first rank kicks off the one-time download/load
+        // in the background and uses basic sorting meanwhile (ModelStore never
+        // blocks a rank on the fetch), so tell the user what they're seeing.
+        return .unavailable(
+            "The MLX model downloads on first use and loads in the background. Using basic sorting until it's ready.")
         #else
         return .unavailable(
             "The MLX big-batch ranker needs an Apple-Silicon \(device); this build can't run it. Using basic sorting.")
@@ -350,34 +351,40 @@ actor ModelStore {
     nonisolated(unsafe) private(set) var isLoaded = false
     nonisolated(unsafe) private(set) var lastUnavailableMessage: String?
 
-    /// Returns the loaded container, kicking off (and de-duping) the one-time
-    /// load on first call. Returns nil if the model can't be loaded (no
-    /// network for the initial download, out of memory, unsupported), letting
-    /// the ranker fall back to deterministic ordering.
+    /// Returns the loaded container if it's ready, **without ever waiting for
+    /// the load** — the first call kicks off the one-time download/load in the
+    /// background and returns nil immediately, so the caller falls back to the
+    /// deterministic ordering for this rank and picks the model up on a later
+    /// one. Ranks are awaited from `refresh()` behind the app-wide loading
+    /// screen; blocking that on a first-use ~1GB Hugging Face download (no
+    /// timeout, no progress) hung the whole app.
     func container() async -> ModelContainer? {
         if let loadedContainer { return loadedContainer }
-        if let loadTask { return await loadTask.value }
-
-        let task = Task<ModelContainer?, Never> { [modelID = MLXRanker.modelID] in
-            do {
-                // Give MLX a modest GPU cache budget; harmless if unsupported.
-                MLX.GPU.set(cacheLimit: 256 * 1024 * 1024)
-                let container = try await loadModelContainer(id: modelID)
-                return container
-            } catch {
-                self.recordLoadFailure(error)
-                return nil
+        if loadTask == nil {
+            loadTask = Task<ModelContainer?, Never> { [modelID = MLXRanker.modelID] in
+                do {
+                    // Give MLX a modest GPU cache budget; harmless if unsupported.
+                    MLX.GPU.set(cacheLimit: 256 * 1024 * 1024)
+                    let container = try await loadModelContainer(id: modelID)
+                    await self.finishLoad(container)
+                    return container
+                } catch {
+                    self.recordLoadFailure(error)
+                    await self.finishLoad(nil)
+                    return nil
+                }
             }
         }
-        loadTask = task
-        let result = await task.value
-        if let result {
-            loadedContainer = result
+        return nil
+    }
+
+    private func finishLoad(_ container: ModelContainer?) {
+        if let container {
+            loadedContainer = container
             isLoaded = true
             lastUnavailableMessage = nil
         }
         loadTask = nil
-        return result
     }
 
     private func recordLoadFailure(_ error: Error) {
